@@ -4,31 +4,41 @@
  */
 package demo.websocket.controller;
 
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 import org.springframework.stereotype.Component;
 
 import javax.websocket.*;
+import javax.websocket.server.PathParam;
 import javax.websocket.server.ServerEndpoint;
 import java.io.IOException;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * @author sunqinwen
  * @version \: WebSocketController.java,v 0.1 2019-01-03 10:56
  * 参考源：https://blog.csdn.net/clmmei_123/article/details/82822456
  */
-@ServerEndpoint("/websocket")
+@ServerEndpoint("/websocket/{room_id}")
 @Component
 public class WebSocketController {
+
+    private ReentrantLock lock = new ReentrantLock();
 
     //静态变量，用来记录当前在线连接数
     private static AtomicInteger counter = new AtomicInteger();
 
     //concurrent包的线程安全Set，用来存放每个客户端对应的MyWebSocket对象。若要实现服务端与单一客户端通信的话，可以使用Map来存放，其中Key可以为用户标识
-    private static CopyOnWriteArraySet<WebSocketController> webSocketSet = new CopyOnWriteArraySet<WebSocketController>();
+    private static Map<Integer, CopyOnWriteArraySet<WebSocketController>> webSocketSetMap = Maps.newConcurrentMap();
 
     //与某个客户端的连接会话，需要通过它来给客户端发送数据
     private Session session;
+
+    //房间id号
+    private Integer roomId;
 
     /**
      * 连接建立成功调用的方法
@@ -36,9 +46,13 @@ public class WebSocketController {
      * @param session 可选的参数。session为与某个客户端的连接会话，需要通过它来给客户端发送数据
      */
     @OnOpen
-    public void onOpen(Session session) {
+    public void onOpen(Session session, @PathParam("room_id") Integer room_id) {
+        this.roomId = room_id;
         this.session = session;
-        webSocketSet.add(this);     //加入set中
+        lock.lock();
+        webSocketSetMap.computeIfAbsent(roomId, k -> Sets.newCopyOnWriteArraySet());
+        webSocketSetMap.get(roomId).add(this);     //加入set中
+        lock.unlock();
         int count = counter.incrementAndGet();  //在线数加1
         System.out.println("有新连接加入！当前在线人数为" + count);
     }
@@ -48,27 +62,25 @@ public class WebSocketController {
      */
     @OnClose
     public void onClose() {
-        webSocketSet.remove(this);  //从set中删除
+        webSocketSetMap.get(roomId).remove(this);  //从set中删除
         int count = counter.decrementAndGet();           //在线数减1
         System.out.println("有一连接关闭！当前在线人数为" + count);
     }
 
     /**
-     * 47      * 收到客户端消息后调用的方法
-     * 48      * @param message 客户端发送过来的消息
-     * 49      * @param session 可选的参数
-     * 50
+     * 收到客户端消息后调用的方法
+     *
+     * @param message 客户端发送过来的消息
      */
     @OnMessage
-    public void onMessage(String message, Session session) {
-        System.out.println("来自客户端的消息:" + message);
+    public void onMessage(String message) {
+        System.out.println("room_id=" + roomId + "的房间收到来自客户端的消息:" + message);
         //群发消息
-        for (WebSocketController item : webSocketSet) {
+        for (WebSocketController item : webSocketSetMap.get(roomId)) {
             try {
                 item.sendMessage(message);
             } catch (IOException e) {
                 e.printStackTrace();
-                continue;
             }
         }
     }
@@ -87,11 +99,10 @@ public class WebSocketController {
     /**
      * 发生错误时调用
      *
-     * @param session
      * @param error
      */
     @OnError
-    public void onError(Session session, Throwable error) {
+    public void onError(Throwable error) {
         System.out.println("发生错误");
         error.printStackTrace();
     }

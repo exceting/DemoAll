@@ -11,8 +11,8 @@ define(function (require, exports, module) {
             });
         },
 
-        go: function () {
-            this.listView.request();
+        go: function (id) {
+            this.listView.request(id);
         },
 
         remove: function () {

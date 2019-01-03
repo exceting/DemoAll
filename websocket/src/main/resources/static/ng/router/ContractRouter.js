@@ -4,33 +4,15 @@ define(function (require, exports, module) {
 
     var ContractRouter = Backbone.Router.extend({
         routes: {
-            "trace": "trace",
-            "span/info/(:id)": "spanInfo",
-            "quill/test": "quillTest",
-            "*path": "home"
+            "home/(:id)": "setHome"
         },
 
         setApp: function (app) {
             this.app = app;
         },
 
-        home: function (queryString) {
-            if (queryString) {
-                var options = BackboneUtil.queryStringToObject(queryString);
-            }
-            this.app.renderHome(options);
-        },
-
-        trace: function () {
-            this.app.renderTrace();
-        },
-
-        spanInfo: function (id) {
-            this.app.renderSpanInfo(id);
-        },
-
-        quillTest: function () {
-            this.app.renderQuillTest();
+        setHome: function (id) {
+            this.app.renderHome(id);
         },
 
         defaultRoute: function (args) {

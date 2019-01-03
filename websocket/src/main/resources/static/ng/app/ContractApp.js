@@ -15,7 +15,7 @@ define(function(require, exports, module) {
             }
         },
 
-        renderHome: function (options) {
+        renderHome: function (id) {
             var app = this;
 
             require.async('module/home/HomePage', function (HomePage) {
@@ -25,49 +25,7 @@ define(function(require, exports, module) {
                         el: app.pageEl
                     });
                 }
-                app.lastPage.go(options);
-            });
-        },
-
-        renderTrace: function () {
-            var app = this;
-
-            require.async('module/trace/TracePage', function (TracePage) {
-                if (!(app.lastPage instanceof TracePage)) {
-                    app.reset();
-                    app.lastPage = new TracePage({
-                        el: app.pageEl
-                    });
-                }
-                app.lastPage.go();
-            });
-        },
-
-        renderSpanInfo: function (id) {
-            var app = this;
-
-            require.async('module/tree/SpanInfoPage', function (SpanInfoPage) {
-                if (!(app.lastPage instanceof SpanInfoPage)) {
-                    app.reset();
-                    app.lastPage = new SpanInfoPage({
-                        el: app.pageEl
-                    });
-                }
                 app.lastPage.go(id);
-            });
-        },
-
-        renderQuillTest: function () {
-            var app = this;
-
-            require.async('module/quill/QuillPage', function (QuillPage) {
-                if (!(app.lastPage instanceof QuillPage)) {
-                    app.reset();
-                    app.lastPage = new QuillPage({
-                        el: app.pageEl
-                    });
-                }
-                app.lastPage.go();
             });
         },
 
