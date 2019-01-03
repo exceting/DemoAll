@@ -80,8 +80,8 @@ public class WebSocketController {
      * @throws IOException
      */
     public void sendMessage(String message) throws IOException {
-        this.session.getBasicRemote().sendText(message);
-        //this.session.getAsyncRemote().sendText(message);
+        //this.session.getBasicRemote().sendText(message);
+        this.session.getAsyncRemote().sendText(message);
     }
 
     /**
