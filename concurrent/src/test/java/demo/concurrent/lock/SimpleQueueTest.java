@@ -43,8 +43,6 @@ public class SimpleQueueTest {
             while ((r = simpleQueue.take()) != null) {
                 System.out.println(r);
             }
-
-            System.out.println("---------------");
         });
 
         Thread.sleep(5000L);
