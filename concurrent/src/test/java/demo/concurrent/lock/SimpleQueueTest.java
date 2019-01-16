@@ -5,25 +5,21 @@
 package demo.concurrent.lock;
 
 import demo.concurrent.lock.queue.SimpleQueue;
+import org.junit.Test;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * @author sunqinwen
- * @version \: ReentrantLockTest.java,v 0.1 2019-01-16 11:46
- * 利用重入锁实现一个具有最大接收能力和最小接收能力的队列
- */
-public class ReentrantLockTest {
+public class SimpleQueueTest {
 
-    static ExecutorService executorService = Executors.newFixedThreadPool(6);
+    private static ExecutorService executorService = Executors.newFixedThreadPool(6);
 
-    static SimpleQueue<Integer> simpleQueue = new SimpleQueue<>(5);
+    private static SimpleQueue<Integer> simpleQueue = new SimpleQueue<>(5);
 
+    @Test
+    public void simpleQueueTest() throws Exception {
 
-    public static void main(String[] args) throws Exception {
-
-        executorService.execute(()->{
+        executorService.execute(() -> {
             simpleQueue.put(1);
             simpleQueue.put(2);
             simpleQueue.put(3);
@@ -41,13 +37,17 @@ public class ReentrantLockTest {
 
         Thread.sleep(5000L);
 
-        executorService.execute(()->{
+        executorService.execute(() -> {
 
             Integer r;
-            while ((r = simpleQueue.take()) != null){
+            while ((r = simpleQueue.take()) != null) {
                 System.out.println(r);
             }
+
+            System.out.println("---------------");
         });
+
+        Thread.sleep(5000L);
     }
 
 }
