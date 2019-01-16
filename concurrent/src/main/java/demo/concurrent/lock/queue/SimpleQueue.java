@@ -27,9 +27,9 @@ public class SimpleQueue<T> {
         nodes = (T[]) new Object[size];
     }
 
-    static Condition notFull = lock.newCondition();
+    private static Condition notFull = lock.newCondition();
 
-    static Condition notEmpty = lock.newCondition();
+    private static Condition notEmpty = lock.newCondition();
 
     public void put(T t) {
         try {
@@ -39,6 +39,10 @@ public class SimpleQueue<T> {
             if (count == nodes.length) { // 队列已满，阻塞
                 System.out.println("目前队列已满，等待取值中");
                 notFull.await();
+            }
+
+            if (cursor > (nodes.length - 1)) {
+                cursor = 0;
             }
 
             nodes[cursor] = t;
@@ -77,8 +81,6 @@ public class SimpleQueue<T> {
             head++;
 
             count--;
-
-            cursor--;
 
             notFull.signalAll();
 

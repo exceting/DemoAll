@@ -30,6 +30,13 @@ public class ReentrantLockTest {
             simpleQueue.put(4);
             simpleQueue.put(5);
             simpleQueue.put(6);
+
+            simpleQueue.put(7);
+            simpleQueue.put(8);
+            simpleQueue.put(9);
+            simpleQueue.put(10);
+            simpleQueue.put(11);
+            simpleQueue.put(12);
         });
 
         Thread.sleep(5000L);
