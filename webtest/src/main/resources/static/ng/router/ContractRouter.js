@@ -4,7 +4,8 @@ define(function (require, exports, module) {
 
     var ContractRouter = Backbone.Router.extend({
         routes: {
-            "home/(:id)": "setHome"
+            "home/(:id)": "setHome",
+            "quill/test": "quillTest",
         },
 
         setApp: function (app) {
@@ -13,6 +14,10 @@ define(function (require, exports, module) {
 
         setHome: function (id) {
             this.app.renderHome(id);
+        },
+
+        quillTest: function () {
+            this.app.renderQuillTest();
         },
 
         defaultRoute: function (args) {
