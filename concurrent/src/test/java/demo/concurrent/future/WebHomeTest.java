@@ -4,8 +4,8 @@
  */
 package demo.concurrent.future;
 
-import demo.concurrent.lock.future.WebHome;
-import demo.concurrent.lock.future.WebModule;
+import demo.concurrent.async.future.WebHome;
+import demo.concurrent.async.future.WebModule;
 import org.junit.Test;
 
 /**

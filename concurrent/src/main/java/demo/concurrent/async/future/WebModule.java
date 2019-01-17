@@ -2,7 +2,7 @@
  * Bilibili.com Inc.
  * Copyright (c) 2009-2019 All Rights Reserved.
  */
-package demo.concurrent.lock.future;
+package demo.concurrent.async.future;
 
 /**
  *
