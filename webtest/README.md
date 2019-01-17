@@ -4,7 +4,7 @@
 
 <div class="toc">
 <ul>
-    <li>程序启动后各实例模块请求的path
+    <li>各实例模块请求的url
         <ol>
             <li><a href="#WebSocket实例">WebSocket实例</a></li>
         </ol>
