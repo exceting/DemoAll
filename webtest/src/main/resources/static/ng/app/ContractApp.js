@@ -46,7 +46,7 @@ define(function(require, exports, module) {
         reset: function() {
             if (this.lastPage) {
                 this.lastPage.remove();
-                this.main$el.append('<div id="page" style="margin-top: 160px"/>');
+                this.main$el.append('<div id="page"/>');
             }
         }
     });
