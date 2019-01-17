@@ -6,18 +6,16 @@
 <ul>
     <li>程序启动后各实例模块请求的path
         <ol>
-            <li><a href="#web_socket">WebSocket实例</a></li>
+            <li><a href="#WebSocket实例">WebSocket实例</a></li>
         </ol>
         <ol>
-            <li><a href="#quill_editer">Quill编辑器实例</a></li>
+            <li><a href="#Quill编辑器实例">Quill编辑器实例</a></li>
         </ol>
     </li>
 </ul>
 </div>
 
-## web_socket
-
-### WebSocket实例
+## WebSocket实例
 
 ***包含url***
 
@@ -26,9 +24,7 @@
 | http://localhost:8081/#home/#{id}   | id是任意数字，表示房间号 |
 
 
-## quill_editer
-
-### Quill编辑器实例
+## Quill编辑器实例
 
 ***包含url***
 
