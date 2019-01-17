@@ -9,18 +9,13 @@ define(function (require, exports, module) {
     require('module/quill/core/katex.min.js');
     require('module/quill/core/highlight.min.js');
 
+    var quill;
+
     var QuillView = Backbone.View.extend({
         mainTpl: mainTemp,
         initialize: function () {
             this.$el.append(this.mainTpl);
-        },
-
-        events: {
-
-        },
-
-        request: function () {
-            var quill = new Quill('#editor-container', {
+            quill = new Quill('#editor-container', {
                 modules: {
                     formula: true,
                     syntax: true,
@@ -29,6 +24,21 @@ define(function (require, exports, module) {
                 placeholder: 'Compose an epic...',
                 theme: 'snow'
             });
+            quill.clipboard.paste('<b>dd</b>')
+        },
+
+        events: {
+            'click .insert_html': 'insertHtml'
+        },
+
+        insertHtml: function () {
+            var htm = this.$el.find('.html_code').val();
+            //quill.getHTML();
+            quill.clipboard.dangerouslyPasteHTML(htm);
+        },
+
+        request: function () {
+
         }
     });
 

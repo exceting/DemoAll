@@ -1,3 +1,15 @@
+<div class="form-group">
+  <label for="html_code" class="col-sm-2 control-label">html代码</label>
+  <div class="col-sm-10">
+    <input type="text" class="html_code form-control" placeholder="请输入html代码">
+  </div>
+</div>
+<div class="form-group">
+  <div class="col-sm-offset-2 col-sm-10">
+    <button class="insert_html btn btn-default">插入</button>
+  </div>
+</div>
+<hr/>
 <div class="container">
 			<div class="row">
 				<div class="col-md-12 mt50">
@@ -47,7 +59,9 @@
 					<button class="ql-clean"></button>
 					</span>
 					</div>
-					<div id="editor-container"></div>
+					<div id="editor-container">
+					<img src="http://imgcdn.wxeditor.com/Uploads/201901/234991/5c2f0694c7253.jpg"/>
+					</div>
             </div>
         </div>
     </div>
