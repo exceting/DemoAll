@@ -4,12 +4,12 @@
 
 <div class="toc">
 <ul>
-    <li>模块
-        <ol>WebSocket实例
-            <li><a href="#web_socket">程序启动后相关的url</a></li>
+    <li>程序启动后各实例模块请求的path
+        <ol>
+            <li><a href="#web_socket">WebSocket实例</a></li>
         </ol>
-        <ol>Quill编辑器实例
-            <li><a href="#quill_editer">程序启动后相关的url</a></li>
+        <ol>
+            <li><a href="#quill_editer">Quill编辑器实例</a></li>
         </ol>
     </li>
 </ul>
