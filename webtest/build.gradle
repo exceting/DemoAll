@@ -25,6 +25,6 @@ dependencies {
 }
 
 bootJar {
-    baseName "websocket"
+    baseName "webtest"
     version ''
 }

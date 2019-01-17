@@ -9,7 +9,7 @@
           <set>
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/concurrent" />
-            <option value="$PROJECT_DIR$/websocket" />
+            <option value="$PROJECT_DIR$/webtest" />
           </set>
         </option>
       </GradleProjectSettings>
