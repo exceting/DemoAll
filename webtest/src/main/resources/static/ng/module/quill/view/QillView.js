@@ -1,6 +1,7 @@
 define(function (require, exports, module) {
 
     seajs.use('module/quill/core/quill.snow.css');
+    seajs.use('module/quill/core/blog_read.css');
     seajs.use('module/quill/core/monokai-sublime.min.css');
 
     var mainTemp = require('module/quill/tpl/QuillView.tpl');
@@ -24,7 +25,7 @@ define(function (require, exports, module) {
                 placeholder: 'Compose an epic...',
                 theme: 'snow'
             });
-            quill.clipboard.paste('<b>dd</b>')
+            // 获取html: quill.container.firstChild.innerHTML
         },
 
         events: {
@@ -33,8 +34,8 @@ define(function (require, exports, module) {
 
         insertHtml: function () {
             var htm = this.$el.find('.html_code').val();
-            //quill.getHTML();
-            quill.clipboard.dangerouslyPasteHTML(htm);
+            //<img src="http://imgcdn.wxeditor.com/Uploads/201901/234991/5c2f0694c7253.jpg"/>
+            this.$el.find('.ql-editor').append(htm);
         },
 
         request: function () {

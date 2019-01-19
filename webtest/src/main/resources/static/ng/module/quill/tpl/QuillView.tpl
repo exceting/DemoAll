@@ -1,3 +1,9 @@
+<div class="media_unit">
+    <div class="media_unit_cover">
+        <img src="http://imgcdn.wxeditor.com/Uploads/201901/234991/5c2f0694c7253.jpg" class="media_unit_cover_img"/>
+    </div>
+</div>
+
 <div class="form-group">
   <label for="html_code" class="col-sm-2 control-label">html代码</label>
   <div class="col-sm-10">
@@ -59,9 +65,7 @@
 					<button class="ql-clean"></button>
 					</span>
 					</div>
-					<div id="editor-container">
-					<img src="http://imgcdn.wxeditor.com/Uploads/201901/234991/5c2f0694c7253.jpg"/>
-					</div>
+					<div id="editor-container"></div>
             </div>
         </div>
     </div>

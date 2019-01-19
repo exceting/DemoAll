@@ -1,0 +1,30 @@
+.media_unit {
+    width: 800px;
+    height: 100px;
+    border: 1px solid #c8c8c8;
+    background-color: #FFF;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.link_a{
+    color: #4481b4;
+    text-decoration: none;
+}
+
+.link_a:hover{
+    color: #ff8190;
+    text-decoration: none;
+}
+
+.media_unit_cover{
+    width: 80px;
+    height: 80px;
+    float: left;
+}
+
+.media_unit_cover_img{
+    height: 80px;
+    width: 80px;
+    border-radius: 4px;
+}
