@@ -1,3 +1,4 @@
 rootProject.name = 'DemoAll'
+include 'dbpool'
 include 'webtest'
 include 'concurrent'
