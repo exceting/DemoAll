@@ -1,0 +1,60 @@
+body{
+    background: url(images/body_bg.png) repeat-x scroll 0 0 #f0eef5;
+    color: #7d8b8d;
+    font-family: Verdana,Arial,Helvetica,sans-serif;
+    font-size: 14px;
+    line-height: 25px;
+    min-height: 101%;
+}
+
+#blogTitle{
+    height: 250px;
+    clear: both;
+    width: 1200px;
+    background: url("http://s2.sinaimg.cn/orignal/001KAQy8zy7qXuaF9N15b");
+    background-size: 100%;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    margin: 0 auto;
+    position: relative;
+}
+
+#blogTitle a {
+    color: #ffffff;
+    text-shadow: 0px 0px 16px #000;
+    text-decoration: underline;
+}
+
+#blogTitle a:hover {
+    color: #e8e8e8;
+    text-decoration: underline;
+}
+
+#blogTitle a:link {
+    color: #000;
+    text-decoration: none;
+}
+
+#blogTitle h1{
+    font-size: 30px;
+    width: 310px;
+    height: 100px;
+    margin: 0 auto;
+    text-align: center;
+    position: relative;
+    top: 80px;
+    font-weight: normal;
+}
+
+#blogTitle h2 {
+    width: 550px;
+    position: relative;
+    height: 75px;
+    font-weight: normal;
+    margin: 0 auto;
+    text-align: center;
+    color: #ffffff;
+    text-shadow: 0px 0px 16px #000;
+    top: 20px;
+    font-size: 16px;
+}

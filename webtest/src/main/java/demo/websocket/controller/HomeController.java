@@ -25,4 +25,9 @@ public class HomeController {
         return new ModelAndView("home");
     }
 
+    @RequestMapping("/blog")
+    public ModelAndView cnblog(HttpServletRequest request, HttpServletResponse response) {
+        return new ModelAndView("cnblog");
+    }
+
 }
