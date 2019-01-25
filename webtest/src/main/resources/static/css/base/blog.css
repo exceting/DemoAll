@@ -7,6 +7,15 @@ body {
     min-height: 101%;
 }
 
+body, div, h1, h2, h3, h4, h5, h6, ul, li, img {
+    margin: 0;
+    padding: 0;
+}
+
+.blogStats {
+    display: none;
+}
+
 #blogTitle {
     height: 250px;
     clear: both;
@@ -24,12 +33,13 @@ body {
 #blogTitle a {
     color: #ffffff;
     text-shadow: 0px 0px 16px #000;
-    text-decoration: underline;
+    text-decoration: none;
+
 }
 
 #blogTitle a:hover {
     color: #e8e8e8;
-    text-decoration: underline;
+    text-decoration: none;
 }
 
 #blogTitle a:link {
@@ -142,8 +152,9 @@ li {
 }
 
 .day {
-    background: #fff;
+    background-color: rgba(255, 255, 255, 0.9);
     padding: 20px;
+    border-radius: 4px;
     border: 1px solid #dedede;
     margin-bottom: -1px;
 }
@@ -153,6 +164,12 @@ li {
     line-height: 1.5em;
     float: left;
     clear: right;
+}
+
+.postSeparator {
+    border-top: 1px dashed silver;
+    margin: 20px 0;
+    clear: both;
 }
 
 .postCon {
@@ -168,14 +185,83 @@ li {
 }
 
 .dayTitle {
-    color: #fff;
-    background-color: #45bcf9;
-    padding: 3px 6px;
+    border: 1px solid #fb7299;
+    border-radius: 100px;
+    padding: 3px 12px;
     font-size: 12px;
     display: block;
     float: left;
     margin-right: 10px;
     z-index: 10;
+}
+
+.dayTitle:hover {
+    color: #fff;
+    background-color: #fb7299;
+}
+
+.dayTitle a {
+    color: #fb7299;
+    text-decoration: none;
+}
+
+.dayTitle a:hover {
+    color: #fff;
+    text-decoration: none;
+}
+
+.postTitle a {
+    font-weight: bold;
+    color: #0e7fbc;
+    text-decoration: none;
+}
+
+.postTitle a:hover {
+    color: #fb7299;
+    text-decoration: underline;
+}
+
+.c_b_p_desc {
+    font-size: 14px;
+    color: #696969;
+    line-height: 200%;
+}
+
+.c_b_p_desc_readmore {
+    padding: 3px 12px;
+    border-radius: 100px;
+    text-decoration: none;
+    border: 1px solid #bcbcbc;
+    margin-left: 10px;
+}
+
+.c_b_p_desc_readmore:hover {
+    color: #858585;
+    border: 1px solid #858585;
+}
+
+a.c_b_p_desc_readmore {
+    color: #bcbcbc;
+    text-decoration: none;
+}
+
+.postDesc {
+    clear: both;
+    color: #bcbcbc;
+    float: none;
+    text-align: left;
+    line-height: 200%;
+    font-size: 13px;
+}
+
+.postDesc a {
+    color: #00a1d6;
+    text-decoration: none;
+}
+
+.postDesc a:hover {
+    color: #fb7299;
+    text-decoration: none;
 }
 
 #sideBar {
@@ -201,4 +287,109 @@ li {
     margin-bottom: 10px;
     padding-bottom: 10px;
     color: #333;
+}
+
+.newsItem{
+    background-color: rgba(255, 255, 255, 0.9);
+    border: 1px solid #dedede;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.catListTitle {
+    font-size: 18px;
+    padding: 10px 20px;
+    color: #4a4a4a;
+    font-weight: normal;
+    border-bottom: 1px solid #dedede;
+}
+
+#blog-news {
+    overflow: visible;
+    margin-bottom: 20px;
+}
+
+#profile_block {
+    padding: 20px;
+    color: #7e8c8d;
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+#profile_block a {
+    color: #00a1d6;
+    text-decoration: none;
+    font-size: 13px;
+}
+
+#profile_block a:hover {
+    color: #fb7299;
+    text-decoration: none;
+}
+
+.Cal {
+    width: 100%;
+}
+
+#blog-calendar{
+    border: 1px solid #dedede;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 10px;
+}
+
+
+table.Cal {
+    font-family: verdana,arial,sans-serif;
+    font-size:11px;
+    color:#333333;
+    border-width: 1px;
+    border-color: #dedede;
+    border-collapse: collapse;
+}
+table.Cal th {
+    border-width: 1px;
+    padding: 8px;
+    border-style: solid;
+    color: #FFF;
+    border-color: #00a1d6;
+    background-color: #00a1d6;
+}
+table.Cal td {
+    border-width: 1px;
+    padding: 5px;
+    border-style: solid;
+    border-color: #dedede;
+    background-color: #ffffff;
+}
+
+.CalTodayDay{
+    background-image: url("/images/point.png");
+    background-size: 100%;
+}
+
+.CalOtherMonthDay{
+    color: #b2b2b2;
+}
+
+.CalWeekendDay{
+    background-image: url("/images/week.png");
+    background-size: 100% 100%;
+}
+
+tr {
+    display: table-row;
+    vertical-align: inherit;
+    border-color: inherit;
+}
+
+table.Cal a{
+    text-decoration: none;
+}
+
+
+table.Cal u{
+    text-decoration: none;
+    color: #ff9b17;
+    font-weight: bold;
 }
