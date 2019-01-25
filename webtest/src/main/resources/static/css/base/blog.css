@@ -58,3 +58,60 @@ body{
     top: 20px;
     font-size: 16px;
 }
+
+#navigator {
+    height: 60px;
+    clear: both;
+    position: relative;
+    border-left: none;
+    border-right: none;
+}
+
+#navList {
+    width: 1200px;
+    margin: 0 auto;
+    height: 60px;
+}
+
+ul, menu, dir {
+    display: block;
+    list-style-type: disc;
+    -webkit-margin-before: 1em;
+    -webkit-margin-after: 1em;
+    -webkit-margin-start: 0px;
+    -webkit-margin-end: 0px;
+    -webkit-padding-start: 40px;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 4px;
+    border: 1px solid #e0e0e0;
+}
+
+h5, h6, ul, li, img {
+    margin: 0;
+    padding: 0;
+}
+
+li {
+    display: list-item;
+    text-align: -webkit-match-parent;
+}
+
+#navList li {
+    float: left;
+    height: 60px;
+    line-height: 60px;
+    list-style-type: none;
+}
+
+#navList a:hover {
+    color: #ff808d;
+    text-decoration: none;
+}
+
+#navList a {
+    padding: 0 20px;
+    font-size: 16px;
+    display: block;
+    color: #292929;
+    text-decoration: none;
+}
