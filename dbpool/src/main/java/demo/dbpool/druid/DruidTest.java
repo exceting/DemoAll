@@ -16,21 +16,8 @@ import java.sql.SQLException;
 public class DruidTest {
 
     public static void main(String[] args) throws SQLException {
-        DruidDataSource druid = new DruidDataSource();
-        druid.setUrl("jdbc:mysql://127.0.0.1:3306/tree_tracer?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&autoReconnect=true&zeroDateTimeBehavior=convertToNull");
-        druid.setDriverClassName("com.mysql.jdbc.Driver");
-        druid.setUsername("root");
-        druid.setPassword("sun123456");
-        druid.setValidationQuery("SELECT 1");
-        druid.setTimeBetweenLogStatsMillis(1000);
-        druid.setInitialSize(5);
-        druid.setRemoveAbandoned(true);
-        druid.setTestOnBorrow(true);
-        druid.setTimeBetweenEvictionRunsMillis(60000);
-        druid.setQueryTimeout(1);
-        druid.setMaxActive(2);
-        druid.setMinIdle(2);
-        druid.setMaxWait(1000L);
+
+        DruidDataSource druid = MakeDruid.makeDruidDatasource();
 
         DruidPooledConnection connection = druid.getConnection();
         DruidPooledConnection connection2 = druid.getConnection();

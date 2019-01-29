@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="demo.dbpool.dao.UserMapper">
+    <insert id="insert" parameterType="demo.dbpool.po.User" useGeneratedKeys="true"
+            keyProperty="user.id">
+        INSERT INTO tb_user
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="user.id != null">id,</if>
+            <if test="user.name != null">`name`,</if>
+            <if test="user.password != null">password,</if>
+            <if test="user.avater != null">avater,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="user.id != null">#{user.id},</if>
+            <if test="user.name != null">#{user.name},</if>
+            <if test="user.password != null">#{user.password},</if>
+            <if test="user.avater != null">#{user.avater},</if>
+        </trim>
+    </insert>
+
+    <select id="one" resultType="demo.dbpool.po.User">
+        SELECT * FROM tb_user WHERE id = #{id}
+    </select>
+</mapper>

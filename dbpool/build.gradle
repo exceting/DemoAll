@@ -1,3 +1,4 @@
+apply from: 'test.gradle'
 buildscript {
     dependencies {
         classpath libs["springboot-gradle-plugin"]
@@ -10,13 +11,23 @@ apply plugin: 'io.spring.dependency-management'
 
 dependencies {
     implementation libs["junit"]
+    implementation libs["springboot-starter-web"]
+    implementation libs["springboot-starter-aop"]
+    implementation libs["spring-context-support"]
+    implementation libs["springboot-starter-aop"]
+    implementation libs["springboot-autoconfigure"]
+    implementation libs["spring-jdbc"]
     implementation libs["fastjson"]
     implementation libs['slf4j']
     implementation libs['junit']
     implementation libs['guava']
     implementation libs['druid']
     implementation libs['mysql']
+    implementation libs['mybatis']
+    implementation libs['mybatis-spring']
 }
+
+println 'hello world!'
 
 bootJar {
     baseName "dbpool"
