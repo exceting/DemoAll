@@ -1,4 +1,4 @@
-apply from: 'test.gradle'
+
 buildscript {
     dependencies {
         classpath libs["springboot-gradle-plugin"]

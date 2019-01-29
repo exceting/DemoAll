@@ -15,8 +15,3 @@ dependencies {
     implementation libs['junit']
     implementation libs['guava']
 }
-
-bootJar {
-    baseName "concurrent"
-    version ''
-}
