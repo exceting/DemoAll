@@ -8,7 +8,11 @@ buildscript {
     }
 }
 
+// 所有项目的通用配置
 allprojects {
+
+    apply plugin: 'java'
+    
     repositories {
         mavenCentral()
         maven { url "http://mvnrepository.com/" }
