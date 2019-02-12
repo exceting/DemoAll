@@ -33,6 +33,22 @@ public class DruidTest {
         //DruidPooledConnection connection2 = druid.getConnection();
 
         //System.out.println("================"+connection2);
+
+        A a = new AImpl();
+        A a2 = new AImpl();
+        System.out.println(a.getClass());
+
+        a.one();
+
+        System.out.println("===="+hash("1")+"      "+"1".hashCode());
+        System.out.println("===="+hash(a)+"      "+a.hashCode());
+        System.out.println("===="+hash(a)+"      "+a.hashCode());
+        System.out.println("===="+hash(a2)+"      "+a2.hashCode());
+    }
+
+    static final int hash(Object key) {
+        int h;
+        return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
     }
 
 }
