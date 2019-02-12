@@ -6,6 +6,7 @@ package demo.dbpool.druid;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  *
@@ -19,5 +20,9 @@ public class AImpl implements A {
         Map<String, Integer> map = new HashMap<>();
         map.put("1", 1);
         System.out.println(map.get("1"));
+
+        Map<String, Integer> map2 = new ConcurrentHashMap<>();
+        map2.put("1", 1);
+        System.out.println(map2.get("1"));
     }
 }
