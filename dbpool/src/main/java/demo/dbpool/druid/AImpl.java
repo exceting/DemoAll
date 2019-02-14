@@ -15,6 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  */
 public class AImpl implements A {
+
+    private ThreadLocal<Integer> threadLocal = new ThreadLocal<>();
+
     @Override
     public void one() {
         Map<String, Integer> map = new HashMap<>();
@@ -24,5 +27,9 @@ public class AImpl implements A {
         Map<String, Integer> map2 = new ConcurrentHashMap<>();
         map2.put("1", 1);
         System.out.println(map2.get("1"));
+
+        threadLocal.set(1);
+
+        System.out.println("---------"+threadLocal.get());
     }
 }
