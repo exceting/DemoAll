@@ -5,86 +5,37 @@
 package demo.jdk.jmx;
 
 /**
- *
  * @author sunqinwen
- * @version \: ThreadLocalTest2.java,v 0.1 2019-02-15 11:48 
- *
+ * @version \: ThreadLocalTest2.java,v 0.1 2019-02-15 11:48
  */
 public class ThreadLocalTest2 {
 
-    private static ThreadLocal<Integer> tl1 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl2 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl3 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl4 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl5 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl6 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl7 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl8 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl9 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl10 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl11 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl12 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl13 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl14 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl15 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl16 = new ThreadLocal<>();
-    private static ThreadLocal<Integer> tl17 = new ThreadLocal<>();
+    private static ThreadLocal<Integer> tl = new InheritableThreadLocal<>();
+    private static ThreadLocal<Hello> tl2 = new InheritableThreadLocal<>();
 
     public static void main(String[] args) throws Exception {
-        tl1.set(1);
-        tl2.set(2);
-        tl3.set(3);
-        tl4.set(4);
-        tl5.set(5);
-        tl6.set(6);
-        tl7.set(7);
-        tl8.set(8);
-        tl9.set(9);
-        tl10.set(10);
-        tl11.set(11);
-        tl12.set(12);
-        tl13.set(13);
-        tl14.set(14);
-        tl15.set(15);
-        tl16.set(16);
-        tl17.set(17);
+        tl.set(1);
 
+        Hello hello = new Hello();
+        hello.setName("init");
+        tl2.set(hello);
+        System.out.println(String.format("当前线程名称: %s, main方法内获取线程内数据为: tl = %s，tl2.name = %s，hello对象地址 = %s",
+                Thread.currentThread().getName(), tl.get(), tl2.get().getName(), tl2.get()));
+        fc();
+        tl.set(2);
+        new Thread(() -> {
+            new Thread(()->{
+               fc();
+            }).start();
+            fc();
+        }).start();
+        Thread.sleep(1000L); //保证下面fc执行一定在上面异步代码之后执行
+        fc(); //继续在主线程内执行，验证上面那一步是否对主线程上下文内容造成影响
+    }
 
-        System.out.println(tl1.get());
-        System.out.println(tl2.get());
-        System.out.println(tl3.get());
-        System.out.println(tl4.get());
-        System.out.println(tl5.get());
-        System.out.println(tl6.get());
-        System.out.println(tl7.get());
-        System.out.println(tl8.get());
-        System.out.println(tl9.get());
-        System.out.println(tl10.get());
-        System.out.println(tl11.get());
-        System.out.println(tl12.get());
-        System.out.println(tl13.get());
-        System.out.println(tl14.get());
-        System.out.println(tl15.get());
-        System.out.println(tl16.get());
-        System.out.println(tl17.get());
-
-        System.out.println(tl1.get());
-        System.out.println(tl2.get());
-        System.out.println(tl3.get());
-        System.out.println(tl4.get());
-        System.out.println(tl5.get());
-        System.out.println(tl6.get());
-        System.out.println(tl7.get());
-        System.out.println(tl8.get());
-        System.out.println(tl9.get());
-        System.out.println(tl10.get());
-        System.out.println(tl11.get());
-        System.out.println(tl12.get());
-        System.out.println(tl13.get());
-        System.out.println(tl14.get());
-        System.out.println(tl15.get());
-        System.out.println(tl16.get());
-        System.out.println(tl17.get());
+    private static void fc() {
+        System.out.println(String.format("当前线程名称: %s, fc方法内获取线程内数据为: tl = %s，tl2.name = %s，hello对象地址 = %s",
+                Thread.currentThread().getName(), tl.get(), tl2.get().getName(), tl2.get()));
     }
 
 }
