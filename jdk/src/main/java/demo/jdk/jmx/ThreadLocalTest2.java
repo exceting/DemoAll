@@ -15,18 +15,15 @@ public class ThreadLocalTest2 {
 
     public static void main(String[] args) throws Exception {
         tl.set(1);
-
         Hello hello = new Hello();
         hello.setName("init");
         tl2.set(hello);
         System.out.println(String.format("当前线程名称: %s, main方法内获取线程内数据为: tl = %s，tl2.name = %s，hello对象地址 = %s",
                 Thread.currentThread().getName(), tl.get(), tl2.get().getName(), tl2.get()));
         fc();
-        tl.set(2);
         new Thread(() -> {
-            new Thread(()->{
-               fc();
-            }).start();
+            tl.set(2);
+            tl2.get().setName("init2");
             fc();
         }).start();
         Thread.sleep(1000L); //保证下面fc执行一定在上面异步代码之后执行
