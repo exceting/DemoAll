@@ -20,38 +20,34 @@ package demo.leetcode.easy;
  * 输出: 21
  * <p>
  * 注意:
- * 假设我们的环境只能存储得下 32 位的有符号整数，则其数值范围为 [−231,  231 − 1]。请根据这个假设，如果反转后整数溢出那么就返回 0。
+ * 假设我们的环境只能存储得下 32 位的有符号整数，则其数值范围为 [−2^31,  2^31 − 1]。请根据这个假设，如果反转后整数溢出那么就返回 0。
  */
 public class Reverse {
 
     public static void main(String[] args) {
-        int x = 100;
+        int x = -1234;
+        //2147483647
+        System.out.println(x);
         System.out.println(reverse(x));
     }
 
-    public static int reverse(int x) {
+    private static int reverse(int x) {
 
-        boolean symbol = false;
-        if (x < 0) {
-            x = x * -1;
-            symbol = true;
+        int r = 0;
+
+        int max = Integer.MAX_VALUE;
+        int min = Integer.MIN_VALUE;
+        while (x != 0) {
+            int i = x % 10;
+            x /= 10;
+            if (r > max / 10 || (r == max / 10 && i > 7)
+            || r < min / 10 || (r == min / 10 && i < -8)) {
+                return 0;
+            }
+            r = r * 10 + i;
         }
 
-        int units = x % 10;
-        int tens = (x % 100) / 10;
-        int hundreds = (x % 1000) / 100;
-
-        int result = (units * 100) + (tens * 10) + hundreds;
-
-        if (symbol) {
-            result *= -1;
-        }
-
-        if (result < -231 || result > 231) {
-            result = 0;
-        }
-
-        return result;
+        return r;
     }
 
 }
