@@ -12,6 +12,13 @@ public class Hello implements HelloMBean {
 
     private String name;
 
+    public Hello() {
+    }
+
+    public Hello(String name) {
+        this.name = name;
+    }
+
     @Override
     public String getName() {
         return name;
