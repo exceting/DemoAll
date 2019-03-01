@@ -53,9 +53,6 @@ public class UserService {
 
             System.out.println("子线程insert2----------");
 
-            Integer a = null;
-            a.equals(1);
-
         }).start();
 
         System.out.println("父线程insert----------");
