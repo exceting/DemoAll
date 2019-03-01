@@ -14,6 +14,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import java.util.Objects;
 
@@ -25,6 +26,7 @@ import java.util.Objects;
 @ComponentScan(basePackages = {
         "demo.websocket"
 })
+@EnableTransactionManagement
 @EnableConfigurationProperties({ServerProperties.class})
 public class AppConfig {
 
