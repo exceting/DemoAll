@@ -42,8 +42,8 @@ public class DatasourceConfig {
         druid.setTestOnBorrow(true);
         druid.setTimeBetweenEvictionRunsMillis(60000);
         druid.setQueryTimeout(1);
-        druid.setMaxActive(2);
-        druid.setMinIdle(2);
+        druid.setMaxActive(1);
+        druid.setMinIdle(1);
         druid.setMaxWait(1000L);
         return druid;
     }
