@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="demo.websocket.mapper.UserMapper">
+
+    <insert id="insert" parameterType="demo.websocket.po.User"
+            useGeneratedKeys="true"
+            keyProperty="pojo.id">
+        INSERT INTO tb_user
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="pojo.id != null">id,</if>
+            <if test="pojo.name != null">`name`,</if>
+            <if test="pojo.password != null">password,</if>
+            <if test="pojo.birth != null">birth,</if>
+            <if test="pojo.address != null">address,</if>
+            <if test="pojo.avater != null">avater,</if>
+            <if test="pojo.is_married != null">is_married,</if>
+            <if test="pojo.create_time != null">create_time,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="pojo.id != null">#{pojo.id},</if>
+            <if test="pojo.name != null">#{pojo.name},</if>
+            <if test="pojo.password != null">#{pojo.password},</if>
+            <if test="pojo.birth != null">#{pojo.birth},</if>
+            <if test="pojo.address != null">#{pojo.address},</if>
+            <if test="pojo.avater != null">#{pojo.avater},</if>
+            <if test="pojo.is_married != null">#{pojo.is_married},</if>
+            <if test="pojo.create_time != null">#{pojo.create_time},</if>
+        </trim>
+    </insert>
+
+    <select id="one" resultType="demo.websocket.po.User">
+        SELECT *
+        FROM tb_user
+        WHERE id = #{id}
+    </select>
+
+</mapper>
