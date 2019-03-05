@@ -35,7 +35,7 @@ public class IsPalindrome {
 
     public static void main(String[] args) {
         IsPalindrome isPalindrome = new IsPalindrome();
-        System.out.println(isPalindrome.isPalindromeV2(1225221));
+        System.out.println(isPalindrome.isPalindromeV3(1225221));
     }
 
     // O(n)
@@ -77,6 +77,24 @@ public class IsPalindrome {
         // 例如，当输入为 12321 时，在 while 循环的末尾我们可以得到 x = 12，revertedNumber = 123，
         // 由于处于中位的数字不影响回文（它总是与自己相等），所以我们可以简单地将其去除。
         return x == revertedNumber || x == revertedNumber / 10;
+    }
+
+    // 训练
+    private boolean isPalindromeV3(int x) {
+        if (x < 0) {
+            return false;
+        }
+        if (x < 10) {
+            return true;
+        }
+
+        int after = 0;
+        while (x > after) {
+            after = after * 10 + x % 10;
+            x /= 10;
+        }
+
+        return x == after || (x == after/10);
     }
 
 }
