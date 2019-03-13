@@ -30,6 +30,7 @@ public class NIOServer {
 
         while (selector.select() > 0) {
             Set<SelectionKey> keys = selector.selectedKeys();
+            System.out.println("size = "+keys.size());
             Iterator<SelectionKey> iterator = keys.iterator();
             while (iterator.hasNext()) {
                 SelectionKey key = iterator.next();
@@ -41,6 +42,7 @@ public class NIOServer {
                     System.out.println(String.format("收到来自 %s 的连接", socketChannel.getRemoteAddress()));
                     socketChannel.register(selector, SelectionKey.OP_READ);
                 } else if (key.isReadable()) {
+                    //System.out.println("----------------------------读模式");
                     SocketChannel socketChannel = (SocketChannel) key.channel();
                     ByteBuffer buffer = ByteBuffer.allocate(1024);
                     int count = socketChannel.read(buffer);

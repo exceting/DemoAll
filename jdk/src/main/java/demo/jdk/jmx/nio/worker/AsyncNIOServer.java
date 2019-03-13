@@ -31,6 +31,7 @@ public class AsyncNIOServer {
 
             while (selector.select() > 0) {
                 Set<SelectionKey> keys = selector.selectedKeys();
+                System.out.println("size = "+keys.size());
                 Iterator<SelectionKey> iterator = keys.iterator();
                 while (iterator.hasNext()) {
                     SelectionKey key = iterator.next();
@@ -43,9 +44,9 @@ public class AsyncNIOServer {
                         SelectionKey readKey = socketChannel.register(selector, SelectionKey.OP_READ);
                         readKey.attach(new NIOWorker());
                     } else if (key.isReadable()) {
-                        System.out.println("----------------------------读模式");
+                        //System.out.println("----------------------------读模式");
                         NIOWorker worker = (NIOWorker) key.attachment();
-                        worker.done(keys, key);
+                        worker.done(key);
                     }
                     keys.remove(key);
                 }

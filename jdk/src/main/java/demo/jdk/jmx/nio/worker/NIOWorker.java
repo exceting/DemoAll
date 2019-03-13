@@ -19,7 +19,7 @@ public class NIOWorker {
 
     private static final ExecutorService service = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
 
-    public void done(Set<SelectionKey> keys, SelectionKey selectionKey) {
+    public void done(SelectionKey selectionKey) {
         service.submit(() -> {
             ByteBuffer buffer = ByteBuffer.allocate(1024);
             SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
@@ -35,7 +35,6 @@ public class NIOWorker {
                         socketChannel.getRemoteAddress(),
                         new String(buffer.array())));
             }
-            keys.remove(selectionKey);
             return null;
         });
     }
