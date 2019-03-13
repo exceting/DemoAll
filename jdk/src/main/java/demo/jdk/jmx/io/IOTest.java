@@ -33,7 +33,6 @@ public class IOTest {
                     System.out.println("客户端已连接到服务器");
                     int i = 0;
                     while (i < 5) {
-                        TimeUnit.SECONDS.sleep(1); //隔一秒钟写一条
                         String info = "来自客户端的第" + (i++) + "条消息";
                         buffer.clear();
                         buffer.put(info.getBytes());
@@ -41,6 +40,7 @@ public class IOTest {
                         while (buffer.hasRemaining()) {
                             socketChannel.write(buffer); //给服务发消息
                         }
+                        TimeUnit.SECONDS.sleep(1); //隔一秒钟写一条
                     }
                     break;
                 }
