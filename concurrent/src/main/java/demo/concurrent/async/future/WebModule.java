@@ -5,20 +5,18 @@
 package demo.concurrent.async.future;
 
 /**
- *
  * @author sunqinwen
- * @version \: WebModule.java,v 0.1 2019-01-16 18:56 
- *
+ * @version \: WebModule.java,v 0.1 2019-01-16 18:56
  */
 public class WebModule {
 
-    private String top;
+    private String top; //顶部Banner位
 
-    private String left;
+    private String left; //左边栏
 
-    private String right;
+    private String right; //右边栏
 
-    private String user;
+    private String user; //用户信息
 
     public String getTop() {
         return top;

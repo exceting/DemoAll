@@ -60,7 +60,7 @@ public class WebHome {
         return "左边栏";
     }
 
-    private String getRight() { // 这里假设getRight需要执行300ms
+    private String getRight() { // 这里假设getRight需要执行80ms
         try {
             Thread.sleep(80L);
         } catch (InterruptedException e) {
