@@ -1,6 +1,7 @@
 package demo.leetcode.easy;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * @lc app=leetcode.cn id=21 lang=java
@@ -33,7 +34,11 @@ public class MergeTwoLists {
         AtomicInteger incre = new AtomicInteger(1);
         incre.incrementAndGet();
         incre.incrementAndGet();
-        System.out.println(incre.get());
+
+        AtomicLong incre2 = new AtomicLong();
+        incre2.addAndGet(100L);
+        incre2.addAndGet(100L);
+        System.out.println(incre.get() +"   "+incre2.get());
         return null;
     }
 
