@@ -1,5 +1,5 @@
 /**
- * Bilibili.com Inc.
+ * sharemer.com Inc.
  * Copyright (c) 2009-2019 All Rights Reserved.
  */
 package demo.jdk.jmx.nio.worker;
@@ -31,7 +31,6 @@ public class AsyncNIOServer {
 
             while (selector.select() > 0) {
                 Set<SelectionKey> keys = selector.selectedKeys();
-                System.out.println("size = "+keys.size());
                 Iterator<SelectionKey> iterator = keys.iterator();
                 while (iterator.hasNext()) {
                     SelectionKey key = iterator.next();
@@ -41,11 +40,10 @@ public class AsyncNIOServer {
                         SocketChannel socketChannel = skc.accept();
                         socketChannel.configureBlocking(false);
                         System.out.println(String.format("收到来自 %s 的连接", socketChannel.getRemoteAddress()));
-                        SelectionKey readKey = socketChannel.register(selector, SelectionKey.OP_READ);
-                        readKey.attach(new NIOWorker());
+                        socketChannel.register(selector, SelectionKey.OP_READ);
                     } else if (key.isReadable()) {
                         //System.out.println("----------------------------读模式");
-                        NIOWorker worker = (NIOWorker) key.attachment();
+                        NIOWorker worker = new NIOWorker();
                         worker.done(key);
                     }
                     keys.remove(key);

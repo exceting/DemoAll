@@ -11,6 +11,7 @@
             <option value="$PROJECT_DIR$/concurrent" />
             <option value="$PROJECT_DIR$/dbpool" />
             <option value="$PROJECT_DIR$/jdk" />
+            <option value="$PROJECT_DIR$/leetcode" />
             <option value="$PROJECT_DIR$/webtest" />
           </set>
         </option>

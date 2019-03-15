@@ -1,5 +1,5 @@
 /**
- * Bilibili.com Inc.
+ * sharemer.com Inc.
  * Copyright (c) 2009-2019 All Rights Reserved.
  */
 package demo.jdk.jmx.nio;
@@ -30,7 +30,6 @@ public class NIOServer {
 
         while (selector.select() > 0) {
             Set<SelectionKey> keys = selector.selectedKeys();
-            System.out.println("size = "+keys.size());
             Iterator<SelectionKey> iterator = keys.iterator();
             while (iterator.hasNext()) {
                 SelectionKey key = iterator.next();

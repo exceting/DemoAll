@@ -1,5 +1,5 @@
 /**
- * Bilibili.com Inc.
+ * sharemer.com Inc.
  * Copyright (c) 2009-2019 All Rights Reserved.
  */
 package demo.websocket.jdbc;
