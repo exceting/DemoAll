@@ -33,4 +33,13 @@ public class WebHomeTest {
         System.out.println("结果为：" + module.toString());
     }
 
+    @Test
+    public void testSimpleASync() throws Exception {
+        // 同步方法测试，预估耗时200ms
+        long start = System.currentTimeMillis();
+        WebModule module = webHome.getWebModuleMsgSimpleAsync();
+        System.out.println("通过异步方法获取首页全部信息消耗时间：" + (System.currentTimeMillis() - start) + "ms");
+        System.out.println("结果为：" + module.toString());
+    }
+
 }

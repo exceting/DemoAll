@@ -42,6 +42,36 @@ public class WebHome {
         return webModule;
     }
 
+    // 简单异步获取
+    public WebModule getWebModuleMsgSimpleAsync() throws ExecutionException, InterruptedException {
+
+        long s = System.currentTimeMillis();
+        WebModule webModule = new WebModule();
+
+        Thread topTask = new Thread(() -> webModule.setTop(this.getTop()));
+        Thread leftTask = new Thread(() -> webModule.setLeft(this.getLeft()));
+        Thread rightTask = new Thread(() -> webModule.setRight(this.getRight()));
+        Thread userTask = new Thread(() -> webModule.setUser(this.getUser()));
+
+        //触发各个异步任务
+        topTask.start();
+        leftTask.start();
+        rightTask.start();
+        userTask.start();
+
+        System.out.println("--------"+(System.currentTimeMillis() - s));
+
+        long s2 = System.currentTimeMillis();
+        //等待所有的任务均执行完毕
+        topTask.join();
+        leftTask.join();
+        rightTask.join();
+        userTask.join();
+        System.out.println("--------"+(System.currentTimeMillis() - s2));
+
+        return webModule;
+    }
+
     private String getTop() { // 这里假设getTop需要执行200ms
         try {
             Thread.sleep(200L);
