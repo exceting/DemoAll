@@ -30,6 +30,7 @@ public class NIOServer {
 
         while (selector.select() > 0) {
             Set<SelectionKey> keys = selector.selectedKeys();
+            System.out.println("~~~~~~~~~~key size = " + (keys.size()));
             Iterator<SelectionKey> iterator = keys.iterator();
             while (iterator.hasNext()) {
                 SelectionKey key = iterator.next();

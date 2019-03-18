@@ -29,8 +29,15 @@ public class AsyncNIOServer {
             serverSocketChannel.bind(new InetSocketAddress(2333));
             serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
 
-            while (selector.select() > 0) {
+            while (true) {
+                int selected = selector.select();
+                if (selected <= 0) {
+                    System.out.println("ERROR! selected <= 0  value = " + selected);
+                    break;
+                }
+                System.out.println("~~~~~~selected = " + selected);
                 Set<SelectionKey> keys = selector.selectedKeys();
+                //System.out.println("~~~~~~~~~~key size = " + (keys.size()));
                 Iterator<SelectionKey> iterator = keys.iterator();
                 while (iterator.hasNext()) {
                     SelectionKey key = iterator.next();
