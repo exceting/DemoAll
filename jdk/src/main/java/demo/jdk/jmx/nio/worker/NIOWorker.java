@@ -32,9 +32,9 @@ public class NIOWorker {
                 System.out.println("连接关闭");
                 return null;
             }
-            if (count == 0) {
+            /*if (count == 0) {
                 return null;
-            }
+            }*/
             // if (count > 0) {
             System.out.println(String.format("收到来自 %s 的消息: %s",
                     socketChannel.getRemoteAddress(),

@@ -33,28 +33,28 @@ public class AsyncNIOServer {
                 int selected = selector.select();
                 if (selected <= 0) {
                     System.out.println("ERROR! selected <= 0  value = " + selected);
-                    break;
+                    continue;
                 }
-                System.out.println("~~~~~~selected = " + selected);
+                //System.out.println("~~~~~~selected = " + selected);
                 Set<SelectionKey> keys = selector.selectedKeys();
                 //System.out.println("~~~~~~~~~~key size = " + (keys.size()));
                 Iterator<SelectionKey> iterator = keys.iterator();
                 while (iterator.hasNext()) {
                     SelectionKey key = iterator.next();
                     iterator.remove();
-                    if (key.isAcceptable()) {
+                    if (key.isValid() && key.isAcceptable()) {
                         ServerSocketChannel skc = (ServerSocketChannel) key.channel();
                         SocketChannel socketChannel = skc.accept();
                         socketChannel.configureBlocking(false);
                         System.out.println(String.format("收到来自 %s 的连接", socketChannel.getRemoteAddress()));
                         socketChannel.register(selector, SelectionKey.OP_READ);
-                    } else if (key.isReadable()) {
+                    } else if (key.isValid() && key.isReadable()) {
                         //System.out.println("----------------------------读模式");
                         NIOWorker worker = new NIOWorker();
                         worker.done(key);
                     }
-                    keys.remove(key);
                 }
+                keys.clear();
             }
         } catch (IOException e) {
             e.printStackTrace();
