@@ -69,7 +69,7 @@ public class PlusOne {
         if (result[0] == 0) {
             int[] newResult = new int[digits.length];
             for (int i = 0; i < digits.length; i++) {
-                newResult[i] = result[i+1];
+                newResult[i] = result[i + 1];
             }
             return newResult;
         }
