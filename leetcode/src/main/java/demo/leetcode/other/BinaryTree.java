@@ -44,17 +44,14 @@ public class BinaryTree {
     }
 
     private boolean find(TreeNode nowNode, int data) {
-        if (root == null) {
-            return false;
-        }
         if (nowNode == null) {
             return false;
         }
         if (data > nowNode.getData()) {
-            find(nowNode.getRight(), data);
+            return find(nowNode.getRight(), data);
         }
         if (data < nowNode.getData()) {
-            find(nowNode.getLeft(), data);
+            return find(nowNode.getLeft(), data);
         }
         return true;
     }
