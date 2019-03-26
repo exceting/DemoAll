@@ -6,6 +6,7 @@ package demo.jdk.jmx.nio.worker;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -50,11 +51,20 @@ public class AsyncNIOServer {
                         socketChannel.register(selector, SelectionKey.OP_READ);
                     } else if (key.isValid() && key.isReadable()) {
                         //System.out.println("----------------------------读模式");
-                        NIOWorker worker = new NIOWorker();
-                        worker.done(key);
+                        ByteBuffer buffer = ByteBuffer.allocate(1024);
+                        SocketChannel socketChannel = (SocketChannel) key.channel();
+                        int count = socketChannel.read(buffer);
+                        if (count < 0) {
+                            //socketChannel.close();
+                            key.cancel();
+                            System.out.println("连接关闭");
+                        } else {
+                            NIOWorker worker = new NIOWorker();
+                            worker.done(count, buffer, socketChannel, key);
+                        }
                     }
                 }
-                keys.clear();
+                //keys.clear();
             }
         } catch (IOException e) {
             e.printStackTrace();

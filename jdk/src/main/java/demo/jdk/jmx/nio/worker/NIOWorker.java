@@ -7,6 +7,7 @@ package demo.jdk.jmx.nio.worker;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -18,19 +19,15 @@ public class NIOWorker {
 
     private static final ExecutorService service = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors() * 2);
 
-    public void done(SelectionKey selectionKey) {
+    public void done(int count, ByteBuffer buffer, SocketChannel socketChannel, SelectionKey selectionKey) {
         service.submit(() -> {
-            ByteBuffer buffer = ByteBuffer.allocate(1024);
-            SocketChannel socketChannel = (SocketChannel) selectionKey.channel();
-            int count = socketChannel.read(buffer);
+
+            int rn = (int) (Math.random() * 5000);
+            System.out.println("----" + rn);
+            Thread.sleep(rn);
+
             if (count == -1) {
                 System.out.println("count = " + count);
-            }
-            if (count < 0) {
-                socketChannel.close();
-                selectionKey.cancel();
-                System.out.println("连接关闭");
-                return null;
             }
             /*if (count == 0) {
                 return null;
