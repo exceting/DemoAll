@@ -40,12 +40,12 @@ public class IOTest {
                         while (buffer.hasRemaining()) {
                             socketChannel.write(buffer); //给服务发消息
                         }
-                        TimeUnit.SECONDS.sleep(1); //隔一秒钟写一条
+                        //TimeUnit.SECONDS.sleep(1); //隔一秒钟写一条
                     }
                     break;
                 }
             }
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         } finally {
             try {
