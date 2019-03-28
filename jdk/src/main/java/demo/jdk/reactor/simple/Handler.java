@@ -50,12 +50,6 @@ public class Handler implements Runnable {
             }
         } catch (IOException e) {
             e.printStackTrace();
-            selectionKey.cancel();
-            try {
-                socketChannel.close();
-            } catch (IOException e2) {
-                e2.printStackTrace();
-            }
         }
     }
 
