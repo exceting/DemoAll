@@ -33,7 +33,7 @@ public class Handler implements Runnable {
         selectionKey = socketChannel.register(selector, 0); //将该客户端注册到selector，得到一个SelectionKey，以后的select到的就绪动作全都是由该对象进行封装
         selectionKey.attach(this); //附加处理对象，当前是Handler对象，run是对象处理业务的方法
         selectionKey.interestOps(SelectionKey.OP_READ); //走到这里，说明之前Acceptor里的建连已完成，那么接下来就是读取动作，因此这里首先将读事件标记为“感兴趣”事件
-        //selector.wakeup(); //唤起select阻塞
+        selector.wakeup(); //唤起select阻塞
     }
 
     @Override
@@ -48,8 +48,15 @@ public class Handler implements Runnable {
                     break;
                 default:
             }
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IOException e) { //这里的异常处理是做了汇总，常出的异常就是server端还有未读/写完的客户端消息，客户端就主动断开连接，这种情况下是不会触发返回-1的，这样下面read和write方法里的cancel和close就都无法触发，这样会导致死循环异常（read/write处理失败，事件又未被cancel，因此会不断的被select到，不断的报异常）
+            System.err.println("read或send时发生异常！异常信息：" + e.getMessage());
+            selectionKey.cancel();
+            try {
+                socketChannel.close();
+            } catch (IOException e2) {
+                System.err.println("关闭信道时发生异常！异常信息：" + e2.getMessage());
+                e2.printStackTrace();
+            }
         }
     }
 
@@ -95,8 +102,6 @@ public class Handler implements Runnable {
             //没断开连接，则再次切换到读
             status = READ;
             selectionKey.interestOps(SelectionKey.OP_READ);
-
-
         }
     }
 }
