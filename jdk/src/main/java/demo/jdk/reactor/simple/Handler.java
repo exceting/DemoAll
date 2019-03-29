@@ -63,7 +63,7 @@ public class Handler implements Runnable {
     private void read() throws IOException {
         if (selectionKey.isValid()) {
             readBuffer.clear();
-            int count = socketChannel.read(readBuffer); //read方法结束，意味着本次读就绪变为读完毕，标记着一次事件的结束
+            int count = socketChannel.read(readBuffer); //read方法结束，意味着本次"读就绪"变为"读完毕"，标记着一次就绪事件的结束
             if (count > 0) {
                 System.out.println(String.format("收到来自 %s 的消息: %s",
                         socketChannel.getRemoteAddress(),
