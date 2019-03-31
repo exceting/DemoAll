@@ -28,10 +28,10 @@ public class Connector implements Runnable {
     @Override
     public void run() {
         try {
-            if (socketChannel.finishConnect()) {
+            if (socketChannel.finishConnect()) { //这里连接完成（与服务端的三次握手完成）
                 System.out.println(String.format("已完成 %s 的连接",
                         socketChannel.getRemoteAddress()));
-                new Handler(socketChannel, selector);
+                new Handler(socketChannel, selector); //连接建立完成后，接下来的动作交给Handler去处理（读写等）
             }
         } catch (IOException e) {
             e.printStackTrace();

@@ -32,7 +32,7 @@ public class Acceptor implements Runnable {
             if (socketChannel != null) {
                 System.out.println(String.format("收到来自 %s 的连接",
                         socketChannel.getRemoteAddress()));
-                new Handler(socketChannel, selector);
+                new Handler(socketChannel, selector); //这里把客户端通道传给Handler，Handler负责接下来的事件处理（除了连接事件以外的事件均可）
             }
         } catch (IOException e) {
             e.printStackTrace();

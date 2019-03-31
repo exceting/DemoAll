@@ -26,7 +26,7 @@ public class Handler implements Runnable {
     private final static int READ = 0;
     private final static int SEND = 1;
 
-    private int status = SEND;
+    private int status = SEND; //与服务端不同，默认最开始是发送数据
 
     private AtomicInteger counter = new AtomicInteger();
 
