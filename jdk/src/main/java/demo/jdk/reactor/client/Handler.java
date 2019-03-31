@@ -68,6 +68,7 @@ public class Handler implements Runnable {
             sendBuffer.clear();
             int count = counter.incrementAndGet();
             if (count <= 10) {
+                System.out.println("客户端数据发送前");
                 sendBuffer.put(String.format("客户端发送的第%s条消息", count).getBytes());
                 sendBuffer.flip(); //切换到读模式，用于让通道读到buffer里的数据
                 socketChannel.write(sendBuffer);
