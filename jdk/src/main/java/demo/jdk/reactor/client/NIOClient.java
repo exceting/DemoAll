@@ -41,8 +41,7 @@ public class NIOClient implements Runnable {
     public void run() {
         try {
             while (!Thread.interrupted()) {
-                int s = selector.select(); //就绪事件到达之前，阻塞
-                System.out.println("client---------size=" + s);
+                selector.select(); //就绪事件到达之前，阻塞
                 Set selected = selector.selectedKeys(); //拿到本次select获取的就绪事件
                 Iterator it = selected.iterator();
                 while (it.hasNext()) {

@@ -57,7 +57,7 @@ public class Handler implements Runnable {
             try {
                 socketChannel.close();
             } catch (IOException e2) {
-                System.err.println("关闭信道时发生异常！异常信息：" + e2.getMessage());
+                System.err.println("关闭通道时发生异常！异常信息：" + e2.getMessage());
                 e2.printStackTrace();
             }
         }
@@ -69,7 +69,7 @@ public class Handler implements Runnable {
             int count = counter.incrementAndGet();
             if (count <= 10) {
                 sendBuffer.put(String.format("客户端发送的第%s条消息", count).getBytes());
-                sendBuffer.flip(); //切换到读模式，用于让信道读到buffer里的数据
+                sendBuffer.flip(); //切换到读模式，用于让通道读到buffer里的数据
                 socketChannel.write(sendBuffer);
 
                 //则再次切换到读，用以接收服务端的响应
@@ -84,7 +84,7 @@ public class Handler implements Runnable {
 
     private void read() throws IOException {
         if (selectionKey.isValid()) {
-            readBuffer.clear(); //切换成buffer的写模式，用于让信道将自己的内容写入到buffer里
+            readBuffer.clear(); //切换成buffer的写模式，用于让通道将自己的内容写入到buffer里
             socketChannel.read(readBuffer);
             System.out.println(String.format("收到来自服务端的消息: %s", new String(readBuffer.array())));
 

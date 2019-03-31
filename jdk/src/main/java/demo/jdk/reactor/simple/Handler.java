@@ -54,7 +54,7 @@ public class Handler implements Runnable {
             try {
                 socketChannel.close();
             } catch (IOException e2) {
-                System.err.println("关闭信道时发生异常！异常信息：" + e2.getMessage());
+                System.err.println("关闭通道时发生异常！异常信息：" + e2.getMessage());
                 e2.printStackTrace();
             }
         }
