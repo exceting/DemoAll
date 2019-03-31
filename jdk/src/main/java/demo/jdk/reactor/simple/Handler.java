@@ -20,7 +20,7 @@ public class Handler implements Runnable {
     private final SocketChannel socketChannel;
 
     private ByteBuffer readBuffer = ByteBuffer.allocate(1024);
-    private ByteBuffer sendBuffer = ByteBuffer.allocate(1024);
+    private ByteBuffer sendBuffer = ByteBuffer.allocate(2048);
 
     private final static int READ = 0;
     private final static int SEND = 1;
@@ -83,14 +83,11 @@ public class Handler implements Runnable {
     void send() throws IOException {
         if (selectionKey.isValid()) {
             sendBuffer.clear();
-            sendBuffer.put("I get the message; 200ok;".getBytes());
+            sendBuffer.put(String.format("我收到来自%s的信息辣：%s,  200ok;",
+                    socketChannel.getRemoteAddress(),
+                    new String(readBuffer.array())).getBytes());
+            sendBuffer.flip();
             int count = socketChannel.write(sendBuffer); //write方法结束，意味着本次写就绪变为写完毕，标记着一次事件的结束
-
-            /*try {
-                Thread.sleep(2000L);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }*/
 
             if (count < 0) {
                 //同上，write场景下，取到-1，也意味着客户端断开连接

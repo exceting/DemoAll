@@ -20,7 +20,7 @@ public class Handler implements Runnable {
     private final SelectionKey selectionKey;
     private final SocketChannel socketChannel;
 
-    private ByteBuffer readBuffer = ByteBuffer.allocate(1024);
+    private ByteBuffer readBuffer = ByteBuffer.allocate(2048);
     private ByteBuffer sendBuffer = ByteBuffer.allocate(1024);
 
     private final static int READ = 0;
@@ -69,6 +69,7 @@ public class Handler implements Runnable {
             int count = counter.incrementAndGet();
             if (count <= 10) {
                 sendBuffer.put(String.format("客户端发送的第%s条消息", count).getBytes());
+                sendBuffer.flip(); //切换到读模式，用于让信道读到buffer里的数据
                 socketChannel.write(sendBuffer);
 
                 //则再次切换到读，用以接收服务端的响应
@@ -83,7 +84,7 @@ public class Handler implements Runnable {
 
     private void read() throws IOException {
         if (selectionKey.isValid()) {
-            readBuffer.clear();
+            readBuffer.clear(); //切换成buffer的写模式，用于让信道将自己的内容写入到buffer里
             socketChannel.read(readBuffer);
             System.out.println(String.format("收到来自服务端的消息: %s", new String(readBuffer.array())));
 
