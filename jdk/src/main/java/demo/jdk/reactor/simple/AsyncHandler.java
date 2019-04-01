@@ -63,6 +63,7 @@ public class AsyncHandler implements Runnable {
                 int count = socketChannel.read(readBuffer); //read方法结束，意味着本次"读就绪"变为"读完毕"，标记着一次就绪事件的结束
                 if (count > 0) {
                     workers.execute(this::readWorker);
+                    selectionKey.interestOps(SelectionKey.OP_WRITE); //注册写方法
                 } else {
                     //读模式下拿到的值是-1，说明客户端已经断开连接，那么将对应的selectKey从selector里清除，否则下次还会select到，因为断开连接意味着读就绪不会变成读完毕，也不cancel，下次select会不停收到该事件
                     //所以在这种场景下，（服务器程序）你需要关闭socketChannel并且取消key，最好是退出当前函数。注意，这个时候服务端要是继续使用该socketChannel进行读操作的话，就会抛出“远程主机强迫关闭一个现有的连接”的IO异常。
@@ -85,6 +86,7 @@ public class AsyncHandler implements Runnable {
     void send() {
         if (selectionKey.isValid()) {
             workers.execute(this::sendWorker);
+            selectionKey.interestOps(SelectionKey.OP_READ);
         }
     }
 
@@ -93,7 +95,7 @@ public class AsyncHandler implements Runnable {
         status = PROCESSING; //处理完成后该状态为响应，表示读入处理完成，接下来可以响应客户端了
         System.out.println(String.format("收到来自客户端的消息: %s",
                 new String(readBuffer.array())));
-        selectionKey.interestOps(SelectionKey.OP_WRITE); //注册写方法
+        status = SEND;
     }
 
     private void sendWorker() {
@@ -116,7 +118,6 @@ public class AsyncHandler implements Runnable {
 
             //没断开连接，则再次切换到读
             status = READ;
-            selectionKey.interestOps(SelectionKey.OP_READ);
         } catch (IOException e) {
             System.err.println("异步处理send业务时发生异常！异常信息：" + e.getMessage());
             selectionKey.cancel();
