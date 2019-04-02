@@ -66,6 +66,11 @@ public class Handler implements Runnable {
             readBuffer.clear();
             int count = socketChannel.read(readBuffer); //read方法结束，意味着本次"读就绪"变为"读完毕"，标记着一次就绪事件的结束
             if (count > 0) {
+                try {
+                    Thread.sleep(1000L);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
                 System.out.println(String.format("收到来自 %s 的消息: %s",
                         socketChannel.getRemoteAddress(),
                         new String(readBuffer.array())));
@@ -88,12 +93,6 @@ public class Handler implements Runnable {
                     socketChannel.getRemoteAddress(),
                     new String(readBuffer.array())).getBytes());
             sendBuffer.flip();
-
-            try {
-                Thread.sleep(2000L); //响应2s
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
 
             int count = socketChannel.write(sendBuffer); //write方法结束，意味着本次写就绪变为写完毕，标记着一次事件的结束
 

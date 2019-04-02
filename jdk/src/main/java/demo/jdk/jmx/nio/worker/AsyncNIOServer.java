@@ -41,6 +41,7 @@ public class AsyncNIOServer {
                 //System.out.println("~~~~~~~~~~key size = " + (keys.size()));
                 Iterator<SelectionKey> iterator = keys.iterator();
                 while (iterator.hasNext()) {
+                    System.out.println("~~~~~~~~~~key size = " + (keys.size()));
                     SelectionKey key = iterator.next();
                     iterator.remove();
                     if (key.isValid() && key.isAcceptable()) {
