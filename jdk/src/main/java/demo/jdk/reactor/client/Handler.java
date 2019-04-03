@@ -86,11 +86,6 @@ public class Handler implements Runnable {
         if (selectionKey.isValid()) {
             readBuffer.clear(); //切换成buffer的写模式，用于让通道将自己的内容写入到buffer里
             socketChannel.read(readBuffer);
-            try {
-                Thread.sleep(1000L);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
             System.out.println(String.format("收到来自服务端的消息: %s", new String(readBuffer.array())));
 
             //收到服务端的响应后，再继续往服务端发送数据

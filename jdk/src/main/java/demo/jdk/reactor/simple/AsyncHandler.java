@@ -31,7 +31,7 @@ public class AsyncHandler implements Runnable {
     private int status = READ; //所有连接完成后都是从一个读取动作开始的
 
     //开启线程数为4的异步处理线程池
-    private static final ExecutorService workers = Executors.newFixedThreadPool(4);
+    private static final ExecutorService workers = Executors.newCachedThreadPool();
 
     AsyncHandler(SocketChannel socketChannel, Selector selector) throws IOException {
         this.socketChannel = socketChannel; //接收客户端连接
@@ -63,7 +63,7 @@ public class AsyncHandler implements Runnable {
                 if (count > 0) {
                     status = PROCESSING; //处理完成后该状态为响应，表示读入处理完成，接下来可以响应客户端了
                     workers.execute(this::readWorker);
-                    selectionKey.interestOps(SelectionKey.OP_WRITE); //注册写方法
+                    selectionKey.interestOps(SelectionKey.OP_WRITE); //注册写事件
                 } else {
                     //读模式下拿到的值是-1，说明客户端已经断开连接，那么将对应的selectKey从selector里清除，否则下次还会select到，因为断开连接意味着读就绪不会变成读完毕，也不cancel，下次select会不停收到该事件
                     //所以在这种场景下，（服务器程序）你需要关闭socketChannel并且取消key，最好是退出当前函数。注意，这个时候服务端要是继续使用该socketChannel进行读操作的话，就会抛出“远程主机强迫关闭一个现有的连接”的IO异常。
@@ -85,6 +85,7 @@ public class AsyncHandler implements Runnable {
 
     void send() {
         if (selectionKey.isValid()) {
+            status = PROCESSING; //置为执行中
             workers.execute(this::sendWorker);
             selectionKey.interestOps(SelectionKey.OP_READ);
         }
@@ -93,7 +94,7 @@ public class AsyncHandler implements Runnable {
     //读入信息后的业务处理
     private void readWorker() {
         try {
-            Thread.sleep(1000L);
+            Thread.sleep(5000L);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -104,7 +105,6 @@ public class AsyncHandler implements Runnable {
 
     private void sendWorker() {
         try {
-            status = PROCESSING; //置为执行中
             sendBuffer.clear();
             sendBuffer.put(String.format("我收到来自%s的信息辣：%s,  200ok;",
                     socketChannel.getRemoteAddress(),

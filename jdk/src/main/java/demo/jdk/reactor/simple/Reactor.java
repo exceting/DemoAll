@@ -54,7 +54,12 @@ public class Reactor implements Runnable {
         Runnable r = (Runnable) (k.attachment()); //这里很关键，拿到每次selectKey里面附带的处理对象，然后调用其run，这个对象在具体的Handler里会进行创建，初始化的附带对象为Acceptor（看上面构造器）
         //调用之前注册的callback对象
         if (r != null) {
+            long s = System.currentTimeMillis();
             r.run();
+            long e = System.currentTimeMillis() - s;
+            //if(e > 1){
+                System.out.println("----------" + e);
+            //}
         }
     }
 }
