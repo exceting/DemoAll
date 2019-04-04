@@ -54,8 +54,8 @@ public class NIOProcessor {
         this.handler = (handler > 0) ? ExecutorUtil.create(name + "-H", handler) : null;
         this.executor = (executor > 0) ? ExecutorUtil.create(name + "-E", executor) : null;
         this.committer = (committer > 0) ? ExecutorUtil.create(name + "-C", committer) : null;
-        this.frontends = new ConcurrentHashMap<Long, FrontendConnection>();
-        this.backends = new ConcurrentHashMap<Long, BackendConnection>();
+        this.frontends = new ConcurrentHashMap<>();
+        this.backends = new ConcurrentHashMap<>();
         this.commands = new CommandCount();
     }
 
