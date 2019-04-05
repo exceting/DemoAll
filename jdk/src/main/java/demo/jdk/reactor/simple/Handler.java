@@ -67,7 +67,7 @@ public class Handler implements Runnable {
             int count = socketChannel.read(readBuffer); //read方法结束，意味着本次"读就绪"变为"读完毕"，标记着一次就绪事件的结束
             if (count > 0) {
                 try {
-                    Thread.sleep(5000L);
+                    Thread.sleep(5000L); //读取信息后睡眠5s当做业务处理瓶颈
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }

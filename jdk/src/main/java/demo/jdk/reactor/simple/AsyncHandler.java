@@ -28,12 +28,12 @@ public class AsyncHandler implements Runnable {
 
     private final static int READ = 0; //读取就绪
     private final static int SEND = 1; //响应就绪
-    private final static int PROCESSING = 3; //处理中
+    private final static int PROCESSING = 2; //处理中
 
     private int status = READ; //所有连接完成后都是从一个读取动作开始的
 
     //开启线程数为4的异步处理线程池
-    private static final ExecutorService workers = Executors.newCachedThreadPool();
+    private static final ExecutorService workers = Executors.newFixedThreadPool(5);
 
     AsyncHandler(SocketChannel socketChannel, Selector selector) throws IOException {
         this.socketChannel = socketChannel; //接收客户端连接
@@ -42,7 +42,7 @@ public class AsyncHandler implements Runnable {
         selectionKey.attach(this); //附加处理对象，当前是Handler对象，run是对象处理业务的方法
         selectionKey.interestOps(SelectionKey.OP_READ); //走到这里，说明之前Acceptor里的建连已完成，那么接下来就是读取动作，因此这里首先将读事件标记为“感兴趣”事件
         this.selector = selector;
-        this.selector.wakeup(); //注册完读事件后需要
+        this.selector.wakeup();
     }
 
     @Override
@@ -65,7 +65,7 @@ public class AsyncHandler implements Runnable {
                 int count = socketChannel.read(readBuffer); //read方法结束，意味着本次"读就绪"变为"读完毕"，标记着一次就绪事件的结束
                 if (count > 0) {
                     status = PROCESSING; //置为处理中，处理完成后该状态为响应，表示读入处理完成，接下来可以响应客户端了
-                    workers.execute(this::readWorker);
+                    workers.execute(this::readWorker); //异步处理
                 } else {
                     //读模式下拿到的值是-1，说明客户端已经断开连接，那么将对应的selectKey从selector里清除，否则下次还会select到，因为断开连接意味着读就绪不会变成读完毕，也不cancel，下次select会不停收到该事件
                     //所以在这种场景下，（服务器程序）你需要关闭socketChannel并且取消key，最好是退出当前函数。注意，这个时候服务端要是继续使用该socketChannel进行读操作的话，就会抛出“远程主机强迫关闭一个现有的连接”的IO异常。
@@ -88,8 +88,8 @@ public class AsyncHandler implements Runnable {
     void send() {
         if (selectionKey.isValid()) {
             status = PROCESSING; //置为执行中
-            workers.execute(this::sendWorker);
-            selectionKey.interestOps(SelectionKey.OP_READ); //等待写入
+            workers.execute(this::sendWorker); //异步处理
+            selectionKey.interestOps(SelectionKey.OP_READ); //重新设置为读
         }
     }
 
