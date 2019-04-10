@@ -1,0 +1,1771 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1200" height="1190" onload="init(evt)" viewBox="0 0 1200 1190" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<style type="text/css">
+	text { font-family:Verdana; font-size:12px; fill:black; }
+	.func_g:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	var details, searchbtn, matchedtxt, svg;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+	}
+
+	// mouse-over for info
+	function s(node) {		// show
+		info = g_to_text(node);
+		details.nodeValue = "Function: " + info;
+	}
+	function c() {			// clear
+		details.nodeValue = ' ';
+	}
+
+	// ctrl-F for search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+	})
+
+	// functions
+	function find_child(parent, name, attr) {
+		var children = parent.childNodes;
+		for (var i=0; i<children.length;i++) {
+			if (children[i].tagName == name)
+				return (attr != undefined) ? children[i].attributes[attr].value : children[i];
+		}
+		return;
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_"+attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_"+attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_"+attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		// if there's any manipulation we want to do to the function
+		// name before it's searched, do it here before returning.
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes["width"].value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes["x"].value = parseFloat(r.attributes["x"].value) +3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2*12*0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		// Fit in full text width
+		if (/^ *$/.test(txt) || t.getSubStringLength(0, txt.length) < w)
+			return;
+
+		for (var x=txt.length-2; x>0; x--) {
+			if (t.getSubStringLength(0, x+2) <= w) {
+				t.textContent = txt.substring(0,x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = (parseFloat(e.attributes["x"].value) - x - 10) * ratio + 10;
+				if(e.tagName == "text") e.attributes["x"].value = find_child(e.parentNode, "rect", "x") + 3;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseFloat(e.attributes["width"].value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_child(c[i], x-10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = 10;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseInt(svg.width.baseVal.value) - (10*2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr["width"].value);
+		var xmin = parseFloat(attr["x"].value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr["y"].value);
+		var ratio = (svg.width.baseVal.value - 2*10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "1.0";
+
+		var el = document.getElementsByTagName("g");
+		for(var i=0;i<el.length;i++){
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a["x"].value);
+			var ew = parseFloat(a["width"].value);
+			// Is it an ancestor
+			if (0 == 0) {
+				var upstack = parseFloat(a["y"].value) > ymin;
+			} else {
+				var upstack = parseFloat(a["y"].value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.style["opacity"] = "0.5";
+					zoom_parent(e);
+					e.onclick = function(e){unzoom(); zoom(this);};
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.style["display"] = "none";
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.style["display"] = "none";
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					e.onclick = function(e){zoom(this);};
+					update_text(e);
+				}
+			}
+		}
+	}
+	function unzoom() {
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "0.0";
+
+		var el = document.getElementsByTagName("g");
+		for(i=0;i<el.length;i++) {
+			el[i].style["display"] = "block";
+			el[i].style["opacity"] = "1";
+			zoom_reset(el[i]);
+			update_text(el[i]);
+		}
+	}
+
+	// search
+	function reset_search() {
+		var el = document.getElementsByTagName("rect");
+		for (var i=0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)", "");
+			if (term != null) {
+				search(term)
+			}
+		} else {
+			reset_search();
+			searching = 0;
+			searchbtn.style["opacity"] = "0.1";
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.style["opacity"] = "0.0";
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		var re = new RegExp(term);
+		var el = document.getElementsByTagName("g");
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			if (e.attributes["class"].value != "func_g")
+				continue;
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (rect == null) {
+				// the rect might be wrapped in an anchor
+				// if nameattr href is being used
+				if (rect = find_child(e, "a")) {
+				    rect = find_child(r, "rect");
+				}
+			}
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes["width"].value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes["x"].value);
+				orig_save(rect, "fill");
+				rect.attributes["fill"].value =
+				    "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+
+		searchbtn.style["opacity"] = "1.0";
+		searchbtn.firstChild.nodeValue = "Reset Search"
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+			return a - b;
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		var fudge = 0.0001;	// JavaScript floating point
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw - fudge) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.style["opacity"] = "1.0";
+		pct = 100 * count / maxwidth;
+		if (pct == 100)
+			pct = "100"
+		else
+			pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+	function searchover(e) {
+		searchbtn.style["opacity"] = "1.0";
+	}
+	function searchout(e) {
+		if (searching) {
+			searchbtn.style["opacity"] = "1.0";
+		} else {
+			searchbtn.style["opacity"] = "0.1";
+		}
+	}
+]]>
+</script>
+<rect x="0" y="0" width="100%" height="100%" fill="rgb(240,240,220)"/>
+<text x="600" y="24" text-anchor="middle" style="font-size:17px">Flame Graph</text>
+<text x="10" y="1173" id="details"> </text>
+<text x="10" y="24" id="unzoom" onclick="unzoom()" style="opacity:0.0;cursor:pointer">Reset Zoom</text>
+<text x="1090" y="24" id="search" onmouseover="searchover()" onmouseout="searchout()" onclick="search_prompt()" style="opacity:0.1;cursor:pointer">Search</text>
+<text x="1090" y="1173" id="matched"> </text>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>all (79 samples, 100.00%)</title><rect x="10.0" y="1139.0" width="1180.0" height="15" fill="#f67575" rx="2" ry="2"/>
+<text x="13.0" y="1150.0">all</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (66 samples, 83.54%)</title><rect x="10.0" y="1123.0" width="985.8" height="15" fill="#dd5151" rx="2" ry="2"/>
+<text x="13.0" y="1134.0">/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted)</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>thread_native_entry(Thread*) (66 samples, 83.54%)</title><rect x="10.0" y="1107.0" width="985.8" height="15" fill="#f37070" rx="2" ry="2"/>
+<text x="13.0" y="1118.0">thread_native_entry(Thread*)</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ConcurrentGCThread::run() (7 samples, 8.86%)</title><rect x="10.0" y="1091.0" width="104.6" height="15" fill="#dada41" rx="2" ry="2"/>
+<text x="13.0" y="1102.0">ConcurrentGC..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>G1YoungRemSetSamplingThread::run_service() (7 samples, 8.86%)</title><rect x="10.0" y="1075.0" width="104.6" height="15" fill="#e1e144" rx="2" ry="2"/>
+<text x="13.0" y="1086.0">G1YoungRemSe..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>G1CollectionSet::iterate(HeapRegionClosure*) const (7 samples, 8.86%)</title><rect x="10.0" y="1059.0" width="104.6" height="15" fill="#b9b935" rx="2" ry="2"/>
+<text x="13.0" y="1070.0">G1Collection..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>G1YoungRemSetSamplingClosure::do_heap_region(HeapRegion*) (7 samples, 8.86%)</title><rect x="10.0" y="1043.0" width="104.6" height="15" fill="#c1c138" rx="2" ry="2"/>
+<text x="13.0" y="1054.0">G1YoungRemSe..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>G1CollectionSet::update_young_region_prediction(HeapRegion*, unsigned long) (2 samples, 2.53%)</title><rect x="39.9" y="1027.0" width="29.8" height="15" fill="#d9d941" rx="2" ry="2"/>
+<text x="42.9" y="1038.0">G1..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>G1Policy::predict_region_elapsed_time_ms(HeapRegion*, bool) const (2 samples, 2.53%)</title><rect x="39.9" y="1011.0" width="29.8" height="15" fill="#bebe37" rx="2" ry="2"/>
+<text x="42.9" y="1022.0">G1..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/ld-2.19.so (deleted) (1 samples, 1.27%)</title><rect x="39.9" y="995.0" width="14.9" height="15" fill="#e65e5e" rx="2" ry="2"/>
+<text x="42.9" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>AbsSeq::davg() const (1 samples, 1.27%)</title><rect x="54.8" y="995.0" width="14.9" height="15" fill="#c9c93b" rx="2" ry="2"/>
+<text x="57.8" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Monitor::lock_without_safepoint_check() (1 samples, 1.27%)</title><rect x="69.7" y="1027.0" width="15.0" height="15" fill="#d1d13e" rx="2" ry="2"/>
+<text x="72.7" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Monitor::unlock() (1 samples, 1.27%)</title><rect x="84.7" y="1027.0" width="14.9" height="15" fill="#c3c339" rx="2" ry="2"/>
+<text x="87.7" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>OtherRegionsTable::occupied() const (1 samples, 1.27%)</title><rect x="99.6" y="1027.0" width="15.0" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="102.6" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GangWorker::loop() (12 samples, 15.19%)</title><rect x="114.6" y="1091.0" width="179.2" height="15" fill="#e3e345" rx="2" ry="2"/>
+<text x="117.6" y="1102.0">GangWorker::loop()</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ParallelSPCleanupTask::work(unsigned int) (12 samples, 15.19%)</title><rect x="114.6" y="1075.0" width="179.2" height="15" fill="#e1e144" rx="2" ry="2"/>
+<text x="117.6" y="1086.0">ParallelSPCleanupTask::..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Threads::possibly_parallel_threads_do(bool, ThreadClosure*) (12 samples, 15.19%)</title><rect x="114.6" y="1059.0" width="179.2" height="15" fill="#d1d13e" rx="2" ry="2"/>
+<text x="117.6" y="1070.0">Threads::possibly_paral..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>JavaThread::nmethods_do(CodeBlobClosure*) [clone .part.63] (11 samples, 13.92%)</title><rect x="129.5" y="1043.0" width="164.3" height="15" fill="#d6d640" rx="2" ry="2"/>
+<text x="132.5" y="1054.0">JavaThread::nmethods_..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>frame::sender(RegisterMap*) const (11 samples, 13.92%)</title><rect x="129.5" y="1027.0" width="164.3" height="15" fill="#b6b634" rx="2" ry="2"/>
+<text x="132.5" y="1038.0">frame::sender(Registe..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CodeCache::find_blob(void*) (1 samples, 1.27%)</title><rect x="204.2" y="1011.0" width="14.9" height="15" fill="#d0d03e" rx="2" ry="2"/>
+<text x="207.2" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ImmutableOopMapSet::find_map_at_offset(int) const (1 samples, 1.27%)</title><rect x="219.1" y="1011.0" width="15.0" height="15" fill="#afaf32" rx="2" ry="2"/>
+<text x="222.1" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>frame::frame(long*, long*, long*, unsigned char*) (4 samples, 5.06%)</title><rect x="234.1" y="1011.0" width="59.7" height="15" fill="#bcbc36" rx="2" ry="2"/>
+<text x="237.1" y="1022.0">frame:..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CodeCache::find_blob(void*) (2 samples, 2.53%)</title><rect x="249.0" y="995.0" width="29.9" height="15" fill="#b6b634" rx="2" ry="2"/>
+<text x="252.0" y="1006.0">Co..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CodeHeap::find_blob_unsafe(void*) const (2 samples, 2.53%)</title><rect x="249.0" y="979.0" width="29.9" height="15" fill="#dbdb42" rx="2" ry="2"/>
+<text x="252.0" y="990.0">Co..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CodeHeap::find_blob_unsafe(void*) const (1 samples, 1.27%)</title><rect x="278.9" y="995.0" width="14.9" height="15" fill="#b7b735" rx="2" ry="2"/>
+<text x="281.9" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>JavaThread::run() (40 samples, 50.63%)</title><rect x="293.8" y="1091.0" width="597.5" height="15" fill="#c5c53a" rx="2" ry="2"/>
+<text x="296.8" y="1102.0">JavaThread::run()</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>JavaThread::thread_main_inner() (40 samples, 50.63%)</title><rect x="293.8" y="1075.0" width="597.5" height="15" fill="#b6b634" rx="2" ry="2"/>
+<text x="296.8" y="1086.0">JavaThread::thread_main_inner()</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CompileBroker::compiler_thread_loop() (32 samples, 40.51%)</title><rect x="293.8" y="1059.0" width="478.0" height="15" fill="#b4b434" rx="2" ry="2"/>
+<text x="296.8" y="1070.0">CompileBroker::compiler_thread_loop()</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CompileBroker::invoke_compiler_on_method(CompileTask*) (32 samples, 40.51%)</title><rect x="293.8" y="1043.0" width="478.0" height="15" fill="#e5e545" rx="2" ry="2"/>
+<text x="296.8" y="1054.0">CompileBroker::invoke_compiler_on_method(CompileTask*)</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>C2Compiler::compile_method(ciEnv*, ciMethod*, int, DirectiveSet*) (32 samples, 40.51%)</title><rect x="293.8" y="1027.0" width="478.0" height="15" fill="#bbbb36" rx="2" ry="2"/>
+<text x="296.8" y="1038.0">C2Compiler::compile_method(ciEnv*, ciMethod*, int, DirectiveSet*)</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Compile::Compile(ciEnv*, C2Compiler*, ciMethod*, int, bool, bool, bool, DirectiveSet*) (32 samples, 40.51%)</title><rect x="293.8" y="1011.0" width="478.0" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="296.8" y="1022.0">Compile::Compile(ciEnv*, C2Compiler*, ciMethod*, int, bool, bool, ..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Compile::Code_Gen() (20 samples, 25.32%)</title><rect x="293.8" y="995.0" width="298.7" height="15" fill="#dddd42" rx="2" ry="2"/>
+<text x="296.8" y="1006.0">Compile::Code_Gen()</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Compile::Output() (2 samples, 2.53%)</title><rect x="293.8" y="979.0" width="29.9" height="15" fill="#d0d03e" rx="2" ry="2"/>
+<text x="296.8" y="990.0">Co..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Compile::BuildOopMaps() (1 samples, 1.27%)</title><rect x="293.8" y="963.0" width="14.9" height="15" fill="#bfbf37" rx="2" ry="2"/>
+<text x="296.8" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>OopFlow::compute_reach(PhaseRegAlloc*, int, Dict*) (1 samples, 1.27%)</title><rect x="293.8" y="947.0" width="14.9" height="15" fill="#d2d23e" rx="2" ry="2"/>
+<text x="296.8" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>OopFlow::build_oop_map(Node*, int, PhaseRegAlloc*, int*) (1 samples, 1.27%)</title><rect x="293.8" y="931.0" width="14.9" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="296.8" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Compile::init_buffer(unsigned int*) (1 samples, 1.27%)</title><rect x="308.7" y="963.0" width="15.0" height="15" fill="#caca3b" rx="2" ry="2"/>
+<text x="311.7" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Compile::shorten_branches(unsigned int*, int&amp;, int&amp;, int&amp;) (1 samples, 1.27%)</title><rect x="308.7" y="947.0" width="15.0" height="15" fill="#e4e445" rx="2" ry="2"/>
+<text x="311.7" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Matcher::match() (1 samples, 1.27%)</title><rect x="323.7" y="979.0" width="14.9" height="15" fill="#bfbf37" rx="2" ry="2"/>
+<text x="326.7" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Matcher::xform(Node*, int) (1 samples, 1.27%)</title><rect x="323.7" y="963.0" width="14.9" height="15" fill="#d9d941" rx="2" ry="2"/>
+<text x="326.7" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Matcher::match_tree(Node const*) (1 samples, 1.27%)</title><rect x="323.7" y="947.0" width="14.9" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="326.7" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Matcher::Label_Root(Node const*, State*, Node*, Node const*) (1 samples, 1.27%)</title><rect x="323.7" y="931.0" width="14.9" height="15" fill="#d9d941" rx="2" ry="2"/>
+<text x="326.7" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Matcher::Label_Root(Node const*, State*, Node*, Node const*) (1 samples, 1.27%)</title><rect x="323.7" y="915.0" width="14.9" height="15" fill="#c5c53a" rx="2" ry="2"/>
+<text x="326.7" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>State::DFA(int, Node const*) (1 samples, 1.27%)</title><rect x="323.7" y="899.0" width="14.9" height="15" fill="#e0e043" rx="2" ry="2"/>
+<text x="326.7" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseCFG::PhaseCFG(Arena*, RootNode*, Matcher&amp;) (2 samples, 2.53%)</title><rect x="338.6" y="979.0" width="29.9" height="15" fill="#bebe37" rx="2" ry="2"/>
+<text x="341.6" y="990.0">Ph..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseCFG::build_cfg() (2 samples, 2.53%)</title><rect x="338.6" y="963.0" width="29.9" height="15" fill="#c2c239" rx="2" ry="2"/>
+<text x="341.6" y="974.0">Ph..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/ld-2.19.so (deleted) (1 samples, 1.27%)</title><rect x="353.5" y="947.0" width="15.0" height="15" fill="#f47272" rx="2" ry="2"/>
+<text x="356.5" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseCFG::do_global_code_motion() (3 samples, 3.80%)</title><rect x="368.5" y="979.0" width="44.8" height="15" fill="#e1e144" rx="2" ry="2"/>
+<text x="371.5" y="990.0">Phas..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseCFG::global_code_motion() (3 samples, 3.80%)</title><rect x="368.5" y="963.0" width="44.8" height="15" fill="#b2b233" rx="2" ry="2"/>
+<text x="371.5" y="974.0">Phas..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseCFG::schedule_local(Block*, GrowableArray&lt;int&gt;&amp;, VectorSet&amp;, long*) (1 samples, 1.27%)</title><rect x="368.5" y="947.0" width="14.9" height="15" fill="#e3e344" rx="2" ry="2"/>
+<text x="371.5" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseCFG::sched_call(Block*, unsigned int, Node_List&amp;, GrowableArray&lt;int&gt;&amp;, MachCallNode*, VectorSet&amp;) (1 samples, 1.27%)</title><rect x="368.5" y="931.0" width="14.9" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="371.5" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::mark_ssa() (1 samples, 1.27%)</title><rect x="383.4" y="947.0" width="15.0" height="15" fill="#b3b333" rx="2" ry="2"/>
+<text x="386.4" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseLive::compute(unsigned int) (1 samples, 1.27%)</title><rect x="398.4" y="947.0" width="14.9" height="15" fill="#b9b935" rx="2" ry="2"/>
+<text x="401.4" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>IndexSetIterator::advance_and_next() (1 samples, 1.27%)</title><rect x="398.4" y="931.0" width="14.9" height="15" fill="#d3d33f" rx="2" ry="2"/>
+<text x="401.4" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::Register_Allocate() (12 samples, 15.19%)</title><rect x="413.3" y="979.0" width="179.2" height="15" fill="#dfdf43" rx="2" ry="2"/>
+<text x="416.3" y="990.0">PhaseChaitin::Register_..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseAggressiveCoalesce::insert_copies(Matcher&amp;) (1 samples, 1.27%)</title><rect x="413.3" y="963.0" width="14.9" height="15" fill="#c2c238" rx="2" ry="2"/>
+<text x="416.3" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::Select() (1 samples, 1.27%)</title><rect x="428.2" y="963.0" width="15.0" height="15" fill="#b2b233" rx="2" ry="2"/>
+<text x="431.2" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>IndexSetIterator::advance_and_next() (1 samples, 1.27%)</title><rect x="428.2" y="947.0" width="15.0" height="15" fill="#b0b032" rx="2" ry="2"/>
+<text x="431.2" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::Simplify() (1 samples, 1.27%)</title><rect x="443.2" y="963.0" width="14.9" height="15" fill="#c8c83b" rx="2" ry="2"/>
+<text x="446.2" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIFG::remove_node(unsigned int) (1 samples, 1.27%)</title><rect x="443.2" y="947.0" width="14.9" height="15" fill="#b2b233" rx="2" ry="2"/>
+<text x="446.2" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>IndexSetIterator::advance_and_next() (1 samples, 1.27%)</title><rect x="443.2" y="931.0" width="14.9" height="15" fill="#bcbc36" rx="2" ry="2"/>
+<text x="446.2" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::Split(unsigned int, ResourceArea*) (2 samples, 2.53%)</title><rect x="458.1" y="963.0" width="29.9" height="15" fill="#e4e445" rx="2" ry="2"/>
+<text x="461.1" y="974.0">Ph..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::split_Rematerialize(Node*, Block*, unsigned int, unsigned int&amp;, GrowableArray&lt;unsigned int&gt;, int, unsigned int*, Node**, bool) (1 samples, 1.27%)</title><rect x="473.0" y="947.0" width="15.0" height="15" fill="#e0e044" rx="2" ry="2"/>
+<text x="476.0" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::clone_projs(Block*, unsigned int, Node*, Node*, unsigned int&amp;) (1 samples, 1.27%)</title><rect x="473.0" y="931.0" width="15.0" height="15" fill="#dddd43" rx="2" ry="2"/>
+<text x="476.0" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::build_ifg_physical(ResourceArea*) (4 samples, 5.06%)</title><rect x="488.0" y="963.0" width="59.7" height="15" fill="#bdbd37" rx="2" ry="2"/>
+<text x="491.0" y="974.0">PhaseC..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::interfere_with_live(unsigned int, IndexSet*) (4 samples, 5.06%)</title><rect x="488.0" y="947.0" width="59.7" height="15" fill="#cccc3c" rx="2" ry="2"/>
+<text x="491.0" y="958.0">PhaseC..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>IndexSetIterator::advance_and_next() (2 samples, 2.53%)</title><rect x="517.8" y="931.0" width="29.9" height="15" fill="#c3c339" rx="2" ry="2"/>
+<text x="520.8" y="942.0">In..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::gather_lrg_masks(bool) (1 samples, 1.27%)</title><rect x="547.7" y="963.0" width="15.0" height="15" fill="#d8d841" rx="2" ry="2"/>
+<text x="550.7" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::post_allocate_copy_removal() (1 samples, 1.27%)</title><rect x="562.7" y="963.0" width="14.9" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="565.7" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseChaitin::elide_copy(Node*, int, Block*, Node_List&amp;, Node_List&amp;, bool) (1 samples, 1.27%)</title><rect x="562.7" y="947.0" width="14.9" height="15" fill="#d3d33f" rx="2" ry="2"/>
+<text x="565.7" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseLive::compute(unsigned int) (1 samples, 1.27%)</title><rect x="577.6" y="963.0" width="14.9" height="15" fill="#cccc3c" rx="2" ry="2"/>
+<text x="580.6" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>IndexSet::alloc_block_containing(unsigned int) (1 samples, 1.27%)</title><rect x="577.6" y="947.0" width="14.9" height="15" fill="#b1b132" rx="2" ry="2"/>
+<text x="580.6" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Compile::Optimize() (10 samples, 12.66%)</title><rect x="592.5" y="995.0" width="149.4" height="15" fill="#c7c73a" rx="2" ry="2"/>
+<text x="595.5" y="1006.0">Compile::Optimize()</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ConnectionGraph::do_analysis(Compile*, PhaseIterGVN*) (1 samples, 1.27%)</title><rect x="592.5" y="979.0" width="15.0" height="15" fill="#e2e244" rx="2" ry="2"/>
+<text x="595.5" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ConnectionGraph::compute_escape() (1 samples, 1.27%)</title><rect x="592.5" y="963.0" width="15.0" height="15" fill="#e2e244" rx="2" ry="2"/>
+<text x="595.5" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ConnectionGraph::complete_connection_graph(GrowableArray&lt;PointsToNode*&gt;&amp;, GrowableArray&lt;JavaObjectNode*&gt;&amp;, GrowableArray&lt;JavaObjectNode*&gt;&amp;, GrowableArray&lt;FieldNode*&gt;&amp;) (1 samples, 1.27%)</title><rect x="592.5" y="947.0" width="15.0" height="15" fill="#d6d640" rx="2" ry="2"/>
+<text x="595.5" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ConnectionGraph::add_java_object_edges(JavaObjectNode*, bool) [clone .constprop.269] (1 samples, 1.27%)</title><rect x="592.5" y="931.0" width="15.0" height="15" fill="#bebe37" rx="2" ry="2"/>
+<text x="595.5" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ConnectionGraph::add_field_uses_to_worklist(FieldNode*) (1 samples, 1.27%)</title><rect x="592.5" y="915.0" width="15.0" height="15" fill="#d7d740" rx="2" ry="2"/>
+<text x="595.5" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ConnectionGraph::add_fields_to_worklist(FieldNode*, PointsToNode*) (1 samples, 1.27%)</title><rect x="592.5" y="899.0" width="15.0" height="15" fill="#d2d23e" rx="2" ry="2"/>
+<text x="595.5" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIdealLoop::build_and_optimize(bool, bool, bool) (5 samples, 6.33%)</title><rect x="607.5" y="979.0" width="74.7" height="15" fill="#c2c239" rx="2" ry="2"/>
+<text x="610.5" y="990.0">PhaseIde..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>IdealLoopTree::loop_predication(PhaseIdealLoop*) (1 samples, 1.27%)</title><rect x="607.5" y="963.0" width="14.9" height="15" fill="#d4d43f" rx="2" ry="2"/>
+<text x="610.5" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>IdealLoopTree::loop_predication(PhaseIdealLoop*) (1 samples, 1.27%)</title><rect x="607.5" y="947.0" width="14.9" height="15" fill="#b8b835" rx="2" ry="2"/>
+<text x="610.5" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>IdealLoopTree::loop_predication(PhaseIdealLoop*) (1 samples, 1.27%)</title><rect x="607.5" y="931.0" width="14.9" height="15" fill="#c7c73a" rx="2" ry="2"/>
+<text x="610.5" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>IdealLoopTree::loop_predication(PhaseIdealLoop*) (1 samples, 1.27%)</title><rect x="607.5" y="915.0" width="14.9" height="15" fill="#dfdf43" rx="2" ry="2"/>
+<text x="610.5" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIdealLoop::loop_predication_impl(IdealLoopTree*) [clone .part.72] (1 samples, 1.27%)</title><rect x="607.5" y="899.0" width="14.9" height="15" fill="#dcdc42" rx="2" ry="2"/>
+<text x="610.5" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIdealLoop::loop_predication_follow_branches(Node*, IdealLoopTree*, float, PathFrequency&amp;, Node_Stack&amp;, VectorSet&amp;, Node_List&amp;) (1 samples, 1.27%)</title><rect x="607.5" y="883.0" width="14.9" height="15" fill="#c1c138" rx="2" ry="2"/>
+<text x="610.5" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIdealLoop::is_dominator(Node*, Node*) (1 samples, 1.27%)</title><rect x="607.5" y="867.0" width="14.9" height="15" fill="#bbbb36" rx="2" ry="2"/>
+<text x="610.5" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIdealLoop::Dominators() (1 samples, 1.27%)</title><rect x="622.4" y="963.0" width="14.9" height="15" fill="#e0e043" rx="2" ry="2"/>
+<text x="625.4" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIdealLoop::build_loop_late(VectorSet&amp;, Node_List&amp;, Node_Stack&amp;) (1 samples, 1.27%)</title><rect x="637.3" y="963.0" width="15.0" height="15" fill="#c2c239" rx="2" ry="2"/>
+<text x="640.3" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIdealLoop::build_loop_late_post(Node*) (1 samples, 1.27%)</title><rect x="637.3" y="947.0" width="15.0" height="15" fill="#d4d43f" rx="2" ry="2"/>
+<text x="640.3" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIdealLoop::get_late_ctrl(Node*, Node*) (1 samples, 1.27%)</title><rect x="637.3" y="931.0" width="15.0" height="15" fill="#e3e345" rx="2" ry="2"/>
+<text x="640.3" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIdealLoop::compute_lca_of_uses(Node*, Node*, bool) (1 samples, 1.27%)</title><rect x="637.3" y="915.0" width="15.0" height="15" fill="#cfcf3d" rx="2" ry="2"/>
+<text x="640.3" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIdealLoop::dom_lca_for_get_late_ctrl_internal(Node*, Node*, Node*) (1 samples, 1.27%)</title><rect x="637.3" y="899.0" width="15.0" height="15" fill="#d3d33f" rx="2" ry="2"/>
+<text x="640.3" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIdealLoop::dom_depth(Node*) const [clone .isra.121] (1 samples, 1.27%)</title><rect x="637.3" y="883.0" width="15.0" height="15" fill="#dede43" rx="2" ry="2"/>
+<text x="640.3" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIterGVN::optimize() (2 samples, 2.53%)</title><rect x="652.3" y="963.0" width="29.9" height="15" fill="#c7c73a" rx="2" ry="2"/>
+<text x="655.3" y="974.0">Ph..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIterGVN::transform_old(Node*) (2 samples, 2.53%)</title><rect x="652.3" y="947.0" width="29.9" height="15" fill="#e1e144" rx="2" ry="2"/>
+<text x="655.3" y="958.0">Ph..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>NodeHash::hash_find_insert(Node*) (1 samples, 1.27%)</title><rect x="652.3" y="931.0" width="14.9" height="15" fill="#c4c439" rx="2" ry="2"/>
+<text x="655.3" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>NodeHash::grow() (1 samples, 1.27%)</title><rect x="652.3" y="915.0" width="14.9" height="15" fill="#dbdb42" rx="2" ry="2"/>
+<text x="655.3" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>RegionNode::Ideal(PhaseGVN*, bool) (1 samples, 1.27%)</title><rect x="667.2" y="931.0" width="15.0" height="15" fill="#d4d43f" rx="2" ry="2"/>
+<text x="670.2" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhiNode::is_unsafe_data_reference(Node*) const (1 samples, 1.27%)</title><rect x="667.2" y="915.0" width="15.0" height="15" fill="#e1e144" rx="2" ry="2"/>
+<text x="670.2" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>VectorSet::operator&lt;&lt;=(unsigned int) (1 samples, 1.27%)</title><rect x="667.2" y="899.0" width="15.0" height="15" fill="#c9c93b" rx="2" ry="2"/>
+<text x="670.2" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIterGVN::optimize() (3 samples, 3.80%)</title><rect x="682.2" y="979.0" width="44.8" height="15" fill="#baba36" rx="2" ry="2"/>
+<text x="685.2" y="990.0">Phas..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseIterGVN::transform_old(Node*) (3 samples, 3.80%)</title><rect x="682.2" y="963.0" width="44.8" height="15" fill="#e3e345" rx="2" ry="2"/>
+<text x="685.2" y="974.0">Phas..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>NodeHash::hash_find_insert(Node*) (2 samples, 2.53%)</title><rect x="682.2" y="947.0" width="29.8" height="15" fill="#e1e144" rx="2" ry="2"/>
+<text x="685.2" y="958.0">No..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>StoreNode::Ideal(PhaseGVN*, bool) (1 samples, 1.27%)</title><rect x="712.0" y="947.0" width="15.0" height="15" fill="#b7b734" rx="2" ry="2"/>
+<text x="715.0" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>InitializeNode::can_capture_store(StoreNode*, PhaseTransform*, bool) [clone .part.138] (1 samples, 1.27%)</title><rect x="712.0" y="931.0" width="15.0" height="15" fill="#dfdf43" rx="2" ry="2"/>
+<text x="715.0" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>InitializeNode::detect_init_independence(Node*, int&amp;) (1 samples, 1.27%)</title><rect x="712.0" y="915.0" width="15.0" height="15" fill="#d2d23e" rx="2" ry="2"/>
+<text x="715.0" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>InitializeNode::detect_init_independence(Node*, int&amp;) (1 samples, 1.27%)</title><rect x="712.0" y="899.0" width="15.0" height="15" fill="#c6c63a" rx="2" ry="2"/>
+<text x="715.0" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>MemNode::all_controls_dominate(Node*, Node*) [clone .part.131] (1 samples, 1.27%)</title><rect x="712.0" y="883.0" width="15.0" height="15" fill="#d1d13e" rx="2" ry="2"/>
+<text x="715.0" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Node::dominates(Node*, Node_List&amp;) (1 samples, 1.27%)</title><rect x="712.0" y="867.0" width="15.0" height="15" fill="#bebe37" rx="2" ry="2"/>
+<text x="715.0" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseMacroExpand::expand_macro_nodes() (1 samples, 1.27%)</title><rect x="727.0" y="979.0" width="14.9" height="15" fill="#dada41" rx="2" ry="2"/>
+<text x="730.0" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseMacroExpand::expand_arraycopy_node(ArrayCopyNode*) (1 samples, 1.27%)</title><rect x="727.0" y="963.0" width="14.9" height="15" fill="#bfbf38" rx="2" ry="2"/>
+<text x="730.0" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseMacroExpand::generate_arraycopy(ArrayCopyNode*, AllocateArrayNode*, Node**, MergeMemNode*, Node**, TypePtr const*, BasicType, Node*, Node*, Node*, Node*, Node*, bool, bool, RegionNode*) (1 samples, 1.27%)</title><rect x="727.0" y="947.0" width="14.9" height="15" fill="#c7c73a" rx="2" ry="2"/>
+<text x="730.0" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>PhaseMacroExpand::generate_clear_array(Node*, MergeMemNode*, TypePtr const*, Node*, BasicType, Node*, Node*, Node*) (1 samples, 1.27%)</title><rect x="727.0" y="931.0" width="14.9" height="15" fill="#bbbb36" rx="2" ry="2"/>
+<text x="730.0" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ClearArrayNode::clear_memory(Node*, Node*, Node*, Node*, Node*, PhaseGVN*) (1 samples, 1.27%)</title><rect x="727.0" y="915.0" width="14.9" height="15" fill="#b9b935" rx="2" ry="2"/>
+<text x="730.0" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Node::Node(Node*, Node*, Node*, Node*) (1 samples, 1.27%)</title><rect x="727.0" y="899.0" width="14.9" height="15" fill="#bebe37" rx="2" ry="2"/>
+<text x="730.0" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ParseGenerator::generate(JVMState*) (2 samples, 2.53%)</title><rect x="741.9" y="995.0" width="29.9" height="15" fill="#cdcd3d" rx="2" ry="2"/>
+<text x="744.9" y="1006.0">Pa..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::Parse(JVMState*, ciMethod*, float) (2 samples, 2.53%)</title><rect x="741.9" y="979.0" width="29.9" height="15" fill="#c5c53a" rx="2" ry="2"/>
+<text x="744.9" y="990.0">Pa..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_all_blocks() (2 samples, 2.53%)</title><rect x="741.9" y="963.0" width="29.9" height="15" fill="#b8b835" rx="2" ry="2"/>
+<text x="744.9" y="974.0">Pa..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_one_block() (2 samples, 2.53%)</title><rect x="741.9" y="947.0" width="29.9" height="15" fill="#e0e044" rx="2" ry="2"/>
+<text x="744.9" y="958.0">Pa..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_one_bytecode() (2 samples, 2.53%)</title><rect x="741.9" y="931.0" width="29.9" height="15" fill="#b4b434" rx="2" ry="2"/>
+<text x="744.9" y="942.0">Pa..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_call() (2 samples, 2.53%)</title><rect x="741.9" y="915.0" width="29.9" height="15" fill="#b5b534" rx="2" ry="2"/>
+<text x="744.9" y="926.0">Pa..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GraphKit::round_double_arguments(ciMethod*) (1 samples, 1.27%)</title><rect x="741.9" y="899.0" width="14.9" height="15" fill="#caca3b" rx="2" ry="2"/>
+<text x="744.9" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>TypeFunc::make(ciMethod*) (1 samples, 1.27%)</title><rect x="741.9" y="883.0" width="14.9" height="15" fill="#d8d841" rx="2" ry="2"/>
+<text x="744.9" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Type::hashcons() (1 samples, 1.27%)</title><rect x="741.9" y="867.0" width="14.9" height="15" fill="#e5e545" rx="2" ry="2"/>
+<text x="744.9" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>TypeTuple::xdual() const (1 samples, 1.27%)</title><rect x="741.9" y="851.0" width="14.9" height="15" fill="#e2e244" rx="2" ry="2"/>
+<text x="744.9" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ParseGenerator::generate(JVMState*) (1 samples, 1.27%)</title><rect x="756.8" y="899.0" width="15.0" height="15" fill="#d4d43f" rx="2" ry="2"/>
+<text x="759.8" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::Parse(JVMState*, ciMethod*, float) (1 samples, 1.27%)</title><rect x="756.8" y="883.0" width="15.0" height="15" fill="#c4c439" rx="2" ry="2"/>
+<text x="759.8" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_all_blocks() (1 samples, 1.27%)</title><rect x="756.8" y="867.0" width="15.0" height="15" fill="#d8d840" rx="2" ry="2"/>
+<text x="759.8" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_one_block() (1 samples, 1.27%)</title><rect x="756.8" y="851.0" width="15.0" height="15" fill="#c3c339" rx="2" ry="2"/>
+<text x="759.8" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_one_bytecode() (1 samples, 1.27%)</title><rect x="756.8" y="835.0" width="15.0" height="15" fill="#bfbf37" rx="2" ry="2"/>
+<text x="759.8" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_call() (1 samples, 1.27%)</title><rect x="756.8" y="819.0" width="15.0" height="15" fill="#bbbb36" rx="2" ry="2"/>
+<text x="759.8" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ParseGenerator::generate(JVMState*) (1 samples, 1.27%)</title><rect x="756.8" y="803.0" width="15.0" height="15" fill="#cfcf3d" rx="2" ry="2"/>
+<text x="759.8" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::Parse(JVMState*, ciMethod*, float) (1 samples, 1.27%)</title><rect x="756.8" y="787.0" width="15.0" height="15" fill="#bcbc36" rx="2" ry="2"/>
+<text x="759.8" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_all_blocks() (1 samples, 1.27%)</title><rect x="756.8" y="771.0" width="15.0" height="15" fill="#b7b735" rx="2" ry="2"/>
+<text x="759.8" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_one_block() (1 samples, 1.27%)</title><rect x="756.8" y="755.0" width="15.0" height="15" fill="#d7d740" rx="2" ry="2"/>
+<text x="759.8" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_one_bytecode() (1 samples, 1.27%)</title><rect x="756.8" y="739.0" width="15.0" height="15" fill="#b5b534" rx="2" ry="2"/>
+<text x="759.8" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_field_access(bool, bool) (1 samples, 1.27%)</title><rect x="756.8" y="723.0" width="15.0" height="15" fill="#dada41" rx="2" ry="2"/>
+<text x="759.8" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Parse::do_put_xxx(Node*, ciField*, bool) (1 samples, 1.27%)</title><rect x="756.8" y="707.0" width="15.0" height="15" fill="#b8b835" rx="2" ry="2"/>
+<text x="759.8" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GraphKit::access_store_at(Node*, Node*, Node*, TypePtr const*, Node*, Type const*, BasicType, unsigned long) (1 samples, 1.27%)</title><rect x="756.8" y="691.0" width="15.0" height="15" fill="#d7d740" rx="2" ry="2"/>
+<text x="759.8" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>BarrierSetC2::store_at(C2Access&amp;, C2AccessValue&amp;) const (1 samples, 1.27%)</title><rect x="756.8" y="675.0" width="15.0" height="15" fill="#b3b333" rx="2" ry="2"/>
+<text x="759.8" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ModRefBarrierSetC2::store_at_resolved(C2Access&amp;, C2AccessValue&amp;) const (1 samples, 1.27%)</title><rect x="756.8" y="659.0" width="15.0" height="15" fill="#e3e345" rx="2" ry="2"/>
+<text x="759.8" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>G1BarrierSetC2::post_barrier(GraphKit*, Node*, Node*, Node*, Node*, unsigned int, Node*, BasicType, bool) const (1 samples, 1.27%)</title><rect x="756.8" y="643.0" width="15.0" height="15" fill="#b1b133" rx="2" ry="2"/>
+<text x="759.8" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>IdealKit::if_then(Node*, BoolTest::mask, Node*, float, float, bool) (1 samples, 1.27%)</title><rect x="756.8" y="627.0" width="15.0" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="759.8" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>NMethodSweeper::sweeper_loop() (8 samples, 10.13%)</title><rect x="771.8" y="1059.0" width="119.5" height="15" fill="#b8b835" rx="2" ry="2"/>
+<text x="774.8" y="1070.0">NMethodSweeper:..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>NMethodSweeper::possibly_sweep() (8 samples, 10.13%)</title><rect x="771.8" y="1043.0" width="119.5" height="15" fill="#bcbc36" rx="2" ry="2"/>
+<text x="774.8" y="1054.0">NMethodSweeper:..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>NMethodSweeper::sweep_code_cache() (8 samples, 10.13%)</title><rect x="771.8" y="1027.0" width="119.5" height="15" fill="#dada41" rx="2" ry="2"/>
+<text x="774.8" y="1038.0">NMethodSweeper:..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>NMethodSweeper::process_compiled_method(CompiledMethod*) (8 samples, 10.13%)</title><rect x="771.8" y="1011.0" width="119.5" height="15" fill="#d7d740" rx="2" ry="2"/>
+<text x="774.8" y="1022.0">NMethodSweeper:..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CompiledMethod::cleanup_inline_caches_impl(bool, bool, bool) (6 samples, 7.59%)</title><rect x="771.8" y="995.0" width="89.6" height="15" fill="#d3d33f" rx="2" ry="2"/>
+<text x="774.8" y="1006.0">CompiledMe..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>NativeCall::destination() const (3 samples, 3.80%)</title><rect x="786.7" y="979.0" width="44.8" height="15" fill="#e4e445" rx="2" ry="2"/>
+<text x="789.7" y="990.0">Nati..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>bool clean_if_nmethod_is_unloaded&lt;CompiledIC&gt;(CompiledIC*, unsigned char*, CompiledMethod*, bool, bool) (2 samples, 2.53%)</title><rect x="831.5" y="979.0" width="29.9" height="15" fill="#eb6565" rx="2" ry="2"/>
+<text x="834.5" y="990.0">bo..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CodeHeap::find_blob_unsafe(void*) const (2 samples, 2.53%)</title><rect x="831.5" y="963.0" width="29.9" height="15" fill="#d8d841" rx="2" ry="2"/>
+<text x="834.5" y="974.0">Co..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>NMethodSweeper::possibly_flush(nmethod*) (1 samples, 1.27%)</title><rect x="861.4" y="995.0" width="14.9" height="15" fill="#b4b433" rx="2" ry="2"/>
+<text x="864.4" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>NMethodSweeper::release_compiled_method(CompiledMethod*) (1 samples, 1.27%)</title><rect x="876.3" y="995.0" width="15.0" height="15" fill="#b6b634" rx="2" ry="2"/>
+<text x="879.3" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CodeHeap::deallocate(void*) (1 samples, 1.27%)</title><rect x="876.3" y="979.0" width="15.0" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="879.3" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>VMThread::run() (4 samples, 5.06%)</title><rect x="891.3" y="1091.0" width="59.7" height="15" fill="#b3b333" rx="2" ry="2"/>
+<text x="894.3" y="1102.0">VMThre..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>VMThread::loop() (4 samples, 5.06%)</title><rect x="891.3" y="1075.0" width="59.7" height="15" fill="#b2b233" rx="2" ry="2"/>
+<text x="894.3" y="1086.0">VMThre..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>SafepointSynchronize::begin() (3 samples, 3.80%)</title><rect x="891.3" y="1059.0" width="44.8" height="15" fill="#baba36" rx="2" ry="2"/>
+<text x="894.3" y="1070.0">Safe..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>SafepointSynchronize::do_cleanup_tasks() (1 samples, 1.27%)</title><rect x="891.3" y="1043.0" width="14.9" height="15" fill="#c8c83b" rx="2" ry="2"/>
+<text x="894.3" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>get_or_compute_monitor_info(JavaThread*) [clone .part.43] (1 samples, 1.27%)</title><rect x="891.3" y="1027.0" width="14.9" height="15" fill="#f57373" rx="2" ry="2"/>
+<text x="894.3" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>vframe::java_sender() const (1 samples, 1.27%)</title><rect x="891.3" y="1011.0" width="14.9" height="15" fill="#cece3d" rx="2" ry="2"/>
+<text x="894.3" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>vframe::sender() const (1 samples, 1.27%)</title><rect x="891.3" y="995.0" width="14.9" height="15" fill="#d8d841" rx="2" ry="2"/>
+<text x="894.3" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>frame::real_sender(RegisterMap*) const (1 samples, 1.27%)</title><rect x="891.3" y="979.0" width="14.9" height="15" fill="#b1b133" rx="2" ry="2"/>
+<text x="894.3" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>frame::sender(RegisterMap*) const (1 samples, 1.27%)</title><rect x="891.3" y="963.0" width="14.9" height="15" fill="#b7b735" rx="2" ry="2"/>
+<text x="894.3" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>frame::frame(long*, long*, long*, unsigned char*) (1 samples, 1.27%)</title><rect x="891.3" y="947.0" width="14.9" height="15" fill="#e5e545" rx="2" ry="2"/>
+<text x="894.3" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.27%)</title><rect x="891.3" y="931.0" width="14.9" height="15" fill="#d34242" rx="2" ry="2"/>
+<text x="894.3" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>system_call_fast_compare_end (1 samples, 1.27%)</title><rect x="891.3" y="915.0" width="14.9" height="15" fill="#f79300" rx="2" ry="2"/>
+<text x="894.3" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>exit_to_usermode_loop (1 samples, 1.27%)</title><rect x="891.3" y="899.0" width="14.9" height="15" fill="#c66200" rx="2" ry="2"/>
+<text x="894.3" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (1 samples, 1.27%)</title><rect x="891.3" y="883.0" width="14.9" height="15" fill="#fe9a00" rx="2" ry="2"/>
+<text x="894.3" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__perf_event_enable (1 samples, 1.27%)</title><rect x="891.3" y="867.0" width="14.9" height="15" fill="#c15d00" rx="2" ry="2"/>
+<text x="894.3" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_futex (1 samples, 1.27%)</title><rect x="891.3" y="851.0" width="14.9" height="15" fill="#f69200" rx="2" ry="2"/>
+<text x="894.3" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wake (1 samples, 1.27%)</title><rect x="891.3" y="835.0" width="14.9" height="15" fill="#c25e00" rx="2" ry="2"/>
+<text x="894.3" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>wake_up_q (1 samples, 1.27%)</title><rect x="891.3" y="819.0" width="14.9" height="15" fill="#be5a00" rx="2" ry="2"/>
+<text x="894.3" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>try_to_wake_up (1 samples, 1.27%)</title><rect x="891.3" y="803.0" width="14.9" height="15" fill="#f99500" rx="2" ry="2"/>
+<text x="894.3" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__lock_text_start (1 samples, 1.27%)</title><rect x="891.3" y="787.0" width="14.9" height="15" fill="#e48000" rx="2" ry="2"/>
+<text x="894.3" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ThreadSafepointState::examine_state_of_thread() (2 samples, 2.53%)</title><rect x="906.2" y="1043.0" width="29.9" height="15" fill="#b8b835" rx="2" ry="2"/>
+<text x="909.2" y="1054.0">Th..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>SafepointSynchronize::end() (1 samples, 1.27%)</title><rect x="936.1" y="1059.0" width="14.9" height="15" fill="#b7b735" rx="2" ry="2"/>
+<text x="939.1" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>WatcherThread::run() (3 samples, 3.80%)</title><rect x="951.0" y="1091.0" width="44.8" height="15" fill="#c4c439" rx="2" ry="2"/>
+<text x="954.0" y="1102.0">Watc..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>WatcherThread::sleep() const (3 samples, 3.80%)</title><rect x="951.0" y="1075.0" width="44.8" height="15" fill="#e1e144" rx="2" ry="2"/>
+<text x="954.0" y="1086.0">Watc..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (2 samples, 2.53%)</title><rect x="951.0" y="1059.0" width="29.9" height="15" fill="#f57373" rx="2" ry="2"/>
+<text x="954.0" y="1070.0">/l..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>system_call_fast_compare_end (2 samples, 2.53%)</title><rect x="951.0" y="1043.0" width="29.9" height="15" fill="#d57100" rx="2" ry="2"/>
+<text x="954.0" y="1054.0">sy..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (2 samples, 2.53%)</title><rect x="951.0" y="1027.0" width="29.9" height="15" fill="#e17d00" rx="2" ry="2"/>
+<text x="954.0" y="1038.0">sy..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>handle_mm_fault (1 samples, 1.27%)</title><rect x="951.0" y="1011.0" width="14.9" height="15" fill="#e37f00" rx="2" ry="2"/>
+<text x="954.0" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__perf_event_enable (1 samples, 1.27%)</title><rect x="951.0" y="995.0" width="14.9" height="15" fill="#db7700" rx="2" ry="2"/>
+<text x="954.0" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_futex (1 samples, 1.27%)</title><rect x="951.0" y="979.0" width="14.9" height="15" fill="#ea8600" rx="2" ry="2"/>
+<text x="954.0" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wake (1 samples, 1.27%)</title><rect x="951.0" y="963.0" width="14.9" height="15" fill="#c46000" rx="2" ry="2"/>
+<text x="954.0" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_madvise (1 samples, 1.27%)</title><rect x="965.9" y="1011.0" width="15.0" height="15" fill="#e07c00" rx="2" ry="2"/>
+<text x="968.9" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>blk_finish_plug (1 samples, 1.27%)</title><rect x="965.9" y="995.0" width="15.0" height="15" fill="#ef8b00" rx="2" ry="2"/>
+<text x="968.9" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>handle_mm_fault (1 samples, 1.27%)</title><rect x="965.9" y="979.0" width="15.0" height="15" fill="#d16d00" rx="2" ry="2"/>
+<text x="968.9" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_futex (1 samples, 1.27%)</title><rect x="965.9" y="963.0" width="15.0" height="15" fill="#fe9a00" rx="2" ry="2"/>
+<text x="968.9" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hrtimer_wakeup (1 samples, 1.27%)</title><rect x="965.9" y="947.0" width="15.0" height="15" fill="#e37f00" rx="2" ry="2"/>
+<text x="968.9" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wait (1 samples, 1.27%)</title><rect x="965.9" y="931.0" width="15.0" height="15" fill="#f79300" rx="2" ry="2"/>
+<text x="968.9" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__unqueue_futex (1 samples, 1.27%)</title><rect x="965.9" y="915.0" width="15.0" height="15" fill="#ee8a00" rx="2" ry="2"/>
+<text x="968.9" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Monitor::wait(bool, long, bool) (1 samples, 1.27%)</title><rect x="980.9" y="1059.0" width="14.9" height="15" fill="#d1d13e" rx="2" ry="2"/>
+<text x="983.9" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Thread::muxAcquire(long volatile*, char const*) (1 samples, 1.27%)</title><rect x="980.9" y="1043.0" width="14.9" height="15" fill="#b0b032" rx="2" ry="2"/>
+<text x="983.9" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>VM_Operation::evaluate() (1 samples, 1.27%)</title><rect x="995.8" y="1123.0" width="15.0" height="15" fill="#d8d840" rx="2" ry="2"/>
+<text x="998.8" y="1134.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>VM_FindDeadlocks::doit() (1 samples, 1.27%)</title><rect x="995.8" y="1107.0" width="15.0" height="15" fill="#dcdc42" rx="2" ry="2"/>
+<text x="998.8" y="1118.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.27%)</title><rect x="995.8" y="1091.0" width="15.0" height="15" fill="#fa7c7c" rx="2" ry="2"/>
+<text x="998.8" y="1102.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>system_call_fast_compare_end (1 samples, 1.27%)</title><rect x="995.8" y="1075.0" width="15.0" height="15" fill="#f69200" rx="2" ry="2"/>
+<text x="998.8" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (1 samples, 1.27%)</title><rect x="995.8" y="1059.0" width="15.0" height="15" fill="#f49000" rx="2" ry="2"/>
+<text x="998.8" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Thread.run (12 samples, 15.19%)</title><rect x="1010.8" y="1123.0" width="179.2" height="15" fill="#6cfd6c" rx="2" ry="2"/>
+<text x="1013.8" y="1134.0">java/lang/Thread.run</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ThreadPoolExecutor$Worker.run (4 samples, 5.06%)</title><rect x="1010.8" y="1107.0" width="59.7" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="1013.8" y="1118.0">java/u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ThreadPoolExecutor.runWorker (4 samples, 5.06%)</title><rect x="1010.8" y="1091.0" width="59.7" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="1013.8" y="1102.0">java/u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ThreadPoolExecutor.getTask (4 samples, 5.06%)</title><rect x="1010.8" y="1075.0" width="59.7" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="1013.8" y="1086.0">java/u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ScheduledThreadPoolExecutor$DelayedWorkQueue.take (4 samples, 5.06%)</title><rect x="1010.8" y="1059.0" width="59.7" height="15" fill="#5aec5a" rx="2" ry="2"/>
+<text x="1013.8" y="1070.0">java/u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ScheduledThreadPoolExecutor$DelayedWorkQueue.take (4 samples, 5.06%)</title><rect x="1010.8" y="1043.0" width="59.7" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="1013.8" y="1054.0">java/u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer$ConditionObject.awaitNanos (2 samples, 2.53%)</title><rect x="1040.6" y="1027.0" width="29.9" height="15" fill="#3bd13b" rx="2" ry="2"/>
+<text x="1043.6" y="1038.0">ja..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/LockSupport.parkNanos (2 samples, 2.53%)</title><rect x="1040.6" y="1011.0" width="29.9" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="1043.6" y="1022.0">ja..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jdk/internal/misc/Unsafe.park (2 samples, 2.53%)</title><rect x="1040.6" y="995.0" width="29.9" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="1043.6" y="1006.0">jd..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Unsafe_Park (2 samples, 2.53%)</title><rect x="1040.6" y="979.0" width="29.9" height="15" fill="#cc3838" rx="2" ry="2"/>
+<text x="1043.6" y="990.0">Un..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.27%)</title><rect x="1055.6" y="963.0" width="14.9" height="15" fill="#eb6565" rx="2" ry="2"/>
+<text x="1058.6" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/tomcat/util/threads/TaskThread$WrappingRunnable.run (6 samples, 7.59%)</title><rect x="1070.5" y="1107.0" width="89.6" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="1073.5" y="1118.0">org/apache..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ThreadPoolExecutor$Worker.run (6 samples, 7.59%)</title><rect x="1070.5" y="1091.0" width="89.6" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="1073.5" y="1102.0">java/util/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ThreadPoolExecutor.runWorker (6 samples, 7.59%)</title><rect x="1070.5" y="1075.0" width="89.6" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1073.5" y="1086.0">java/util/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/tomcat/util/net/SocketProcessorBase.run (6 samples, 7.59%)</title><rect x="1070.5" y="1059.0" width="89.6" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="1073.5" y="1070.0">org/apache..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/tomcat/util/net/NioEndpoint$SocketProcessor.doRun (6 samples, 7.59%)</title><rect x="1070.5" y="1043.0" width="89.6" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="1073.5" y="1054.0">org/apache..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/coyote/AbstractProtocol$ConnectionHandler.process (6 samples, 7.59%)</title><rect x="1070.5" y="1027.0" width="89.6" height="15" fill="#45da45" rx="2" ry="2"/>
+<text x="1073.5" y="1038.0">org/apache..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/coyote/AbstractProcessorLight.process (6 samples, 7.59%)</title><rect x="1070.5" y="1011.0" width="89.6" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1073.5" y="1022.0">org/apache..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/coyote/http11/Http11Processor.service (6 samples, 7.59%)</title><rect x="1070.5" y="995.0" width="89.6" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="1073.5" y="1006.0">org/apache..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/connector/CoyoteAdapter.service (5 samples, 6.33%)</title><rect x="1070.5" y="979.0" width="74.7" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="1073.5" y="990.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/StandardEngineValve.invoke (5 samples, 6.33%)</title><rect x="1070.5" y="963.0" width="74.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1073.5" y="974.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/valves/ErrorReportValve.invoke (5 samples, 6.33%)</title><rect x="1070.5" y="947.0" width="74.7" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="1073.5" y="958.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/StandardHostValve.invoke (5 samples, 6.33%)</title><rect x="1070.5" y="931.0" width="74.7" height="15" fill="#50e450" rx="2" ry="2"/>
+<text x="1073.5" y="942.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/authenticator/AuthenticatorBase.invoke (5 samples, 6.33%)</title><rect x="1070.5" y="915.0" width="74.7" height="15" fill="#6cfd6c" rx="2" ry="2"/>
+<text x="1073.5" y="926.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/StandardContextValve.invoke (5 samples, 6.33%)</title><rect x="1070.5" y="899.0" width="74.7" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="1073.5" y="910.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/StandardWrapperValve.invoke (5 samples, 6.33%)</title><rect x="1070.5" y="883.0" width="74.7" height="15" fill="#52e652" rx="2" ry="2"/>
+<text x="1073.5" y="894.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.doFilter (5 samples, 6.33%)</title><rect x="1070.5" y="867.0" width="74.7" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="1073.5" y="878.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.internalDoFilter (5 samples, 6.33%)</title><rect x="1070.5" y="851.0" width="74.7" height="15" fill="#38ce38" rx="2" ry="2"/>
+<text x="1073.5" y="862.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/web/filter/OncePerRequestFilter.doFilter (5 samples, 6.33%)</title><rect x="1070.5" y="835.0" width="74.7" height="15" fill="#4ee14e" rx="2" ry="2"/>
+<text x="1073.5" y="846.0">org/spri..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/web/filter/CharacterEncodingFilter.doFilterInternal (5 samples, 6.33%)</title><rect x="1070.5" y="819.0" width="74.7" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1073.5" y="830.0">org/spri..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.doFilter (5 samples, 6.33%)</title><rect x="1070.5" y="803.0" width="74.7" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="1073.5" y="814.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.internalDoFilter (5 samples, 6.33%)</title><rect x="1070.5" y="787.0" width="74.7" height="15" fill="#4de04d" rx="2" ry="2"/>
+<text x="1073.5" y="798.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/web/filter/OncePerRequestFilter.doFilter (5 samples, 6.33%)</title><rect x="1070.5" y="771.0" width="74.7" height="15" fill="#46da46" rx="2" ry="2"/>
+<text x="1073.5" y="782.0">org/spri..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/web/filter/HiddenHttpMethodFilter.doFilterInternal (5 samples, 6.33%)</title><rect x="1070.5" y="755.0" width="74.7" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="1073.5" y="766.0">org/spri..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.doFilter (5 samples, 6.33%)</title><rect x="1070.5" y="739.0" width="74.7" height="15" fill="#4cdf4c" rx="2" ry="2"/>
+<text x="1073.5" y="750.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.internalDoFilter (5 samples, 6.33%)</title><rect x="1070.5" y="723.0" width="74.7" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="1073.5" y="734.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/web/filter/OncePerRequestFilter.doFilter (5 samples, 6.33%)</title><rect x="1070.5" y="707.0" width="74.7" height="15" fill="#46da46" rx="2" ry="2"/>
+<text x="1073.5" y="718.0">org/spri..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/web/filter/FormContentFilter.doFilterInternal (5 samples, 6.33%)</title><rect x="1070.5" y="691.0" width="74.7" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1073.5" y="702.0">org/spri..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.doFilter (5 samples, 6.33%)</title><rect x="1070.5" y="675.0" width="74.7" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="1073.5" y="686.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.internalDoFilter (5 samples, 6.33%)</title><rect x="1070.5" y="659.0" width="74.7" height="15" fill="#40d440" rx="2" ry="2"/>
+<text x="1073.5" y="670.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/web/filter/OncePerRequestFilter.doFilter (5 samples, 6.33%)</title><rect x="1070.5" y="643.0" width="74.7" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="1073.5" y="654.0">org/spri..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/web/filter/RequestContextFilter.doFilterInternal (5 samples, 6.33%)</title><rect x="1070.5" y="627.0" width="74.7" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="1073.5" y="638.0">org/spri..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.doFilter (5 samples, 6.33%)</title><rect x="1070.5" y="611.0" width="74.7" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="1073.5" y="622.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.internalDoFilter (5 samples, 6.33%)</title><rect x="1070.5" y="595.0" width="74.7" height="15" fill="#44d844" rx="2" ry="2"/>
+<text x="1073.5" y="606.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/tomcat/websocket/server/WsFilter.doFilter (5 samples, 6.33%)</title><rect x="1070.5" y="579.0" width="74.7" height="15" fill="#5cef5c" rx="2" ry="2"/>
+<text x="1073.5" y="590.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.doFilter (5 samples, 6.33%)</title><rect x="1070.5" y="563.0" width="74.7" height="15" fill="#3cd23c" rx="2" ry="2"/>
+<text x="1073.5" y="574.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/catalina/core/ApplicationFilterChain.internalDoFilter (5 samples, 6.33%)</title><rect x="1070.5" y="547.0" width="74.7" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="1073.5" y="558.0">org/apac..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>javax/servlet/http/HttpServlet.service (5 samples, 6.33%)</title><rect x="1070.5" y="531.0" width="74.7" height="15" fill="#34ca34" rx="2" ry="2"/>
+<text x="1073.5" y="542.0">javax/se..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>javax/servlet/http/HttpServlet.service (5 samples, 6.33%)</title><rect x="1070.5" y="515.0" width="74.7" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="1073.5" y="526.0">javax/se..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/prometheus/client/exporter/MetricsServlet.doGet (5 samples, 6.33%)</title><rect x="1070.5" y="499.0" width="74.7" height="15" fill="#5bee5b" rx="2" ry="2"/>
+<text x="1073.5" y="510.0">io/prome..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/prometheus/client/exporter/common/TextFormat.write004 (5 samples, 6.33%)</title><rect x="1070.5" y="483.0" width="74.7" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="1073.5" y="494.0">io/prome..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/prometheus/client/CollectorRegistry$MetricFamilySamplesEnumeration.nextElement (5 samples, 6.33%)</title><rect x="1070.5" y="467.0" width="74.7" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="1073.5" y="478.0">io/prome..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/prometheus/client/CollectorRegistry$MetricFamilySamplesEnumeration.nextElement (5 samples, 6.33%)</title><rect x="1070.5" y="451.0" width="74.7" height="15" fill="#46db46" rx="2" ry="2"/>
+<text x="1073.5" y="462.0">io/prome..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/prometheus/client/CollectorRegistry$MetricFamilySamplesEnumeration.findNextElement (5 samples, 6.33%)</title><rect x="1070.5" y="435.0" width="74.7" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="1073.5" y="446.0">io/prome..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/prometheus/client/hotspot/StandardExports.collect (5 samples, 6.33%)</title><rect x="1070.5" y="419.0" width="74.7" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="1073.5" y="430.0">io/prome..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/prometheus/client/hotspot/StandardExports.callLongGetter (4 samples, 5.06%)</title><rect x="1070.5" y="403.0" width="59.8" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="1073.5" y="414.0">io/pro..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/prometheus/client/hotspot/StandardExports.callLongGetter (4 samples, 5.06%)</title><rect x="1070.5" y="387.0" width="59.8" height="15" fill="#5df05d" rx="2" ry="2"/>
+<text x="1073.5" y="398.0">io/pro..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/prometheus/client/hotspot/StandardExports.callLongGetter (4 samples, 5.06%)</title><rect x="1070.5" y="371.0" width="59.8" height="15" fill="#45da45" rx="2" ry="2"/>
+<text x="1073.5" y="382.0">io/pro..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/reflect/Method.invoke (4 samples, 5.06%)</title><rect x="1070.5" y="355.0" width="59.8" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="1073.5" y="366.0">java/l..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jdk/internal/reflect/DelegatingMethodAccessorImpl.invoke (4 samples, 5.06%)</title><rect x="1070.5" y="339.0" width="59.8" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="1073.5" y="350.0">jdk/in..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jdk/internal/reflect/GeneratedMethodAccessor163.invoke (1 samples, 1.27%)</title><rect x="1070.5" y="323.0" width="14.9" height="15" fill="#69fa69" rx="2" ry="2"/>
+<text x="1073.5" y="334.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/management/internal/OperatingSystemImpl.getProcessCpuTime (1 samples, 1.27%)</title><rect x="1070.5" y="307.0" width="14.9" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="1073.5" y="318.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/management/internal/OperatingSystemImpl.getProcessCpuTime0 (1 samples, 1.27%)</title><rect x="1070.5" y="291.0" width="14.9" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="1073.5" y="302.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[unknown] (1 samples, 1.27%)</title><rect x="1070.5" y="275.0" width="14.9" height="15" fill="#d64646" rx="2" ry="2"/>
+<text x="1073.5" y="286.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libc-2.19.so (deleted) (1 samples, 1.27%)</title><rect x="1070.5" y="259.0" width="14.9" height="15" fill="#e55c5c" rx="2" ry="2"/>
+<text x="1073.5" y="270.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>system_call_fast_compare_end (1 samples, 1.27%)</title><rect x="1070.5" y="243.0" width="14.9" height="15" fill="#c35f00" rx="2" ry="2"/>
+<text x="1073.5" y="254.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_times (1 samples, 1.27%)</title><rect x="1070.5" y="227.0" width="14.9" height="15" fill="#ce6a00" rx="2" ry="2"/>
+<text x="1073.5" y="238.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_sys_times (1 samples, 1.27%)</title><rect x="1070.5" y="211.0" width="14.9" height="15" fill="#f79300" rx="2" ry="2"/>
+<text x="1073.5" y="222.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>thread_group_cputime_adjusted (1 samples, 1.27%)</title><rect x="1070.5" y="195.0" width="14.9" height="15" fill="#ea8600" rx="2" ry="2"/>
+<text x="1073.5" y="206.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>thread_group_cputime (1 samples, 1.27%)</title><rect x="1070.5" y="179.0" width="14.9" height="15" fill="#c46000" rx="2" ry="2"/>
+<text x="1073.5" y="190.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jdk/internal/reflect/GeneratedMethodAccessor164.invoke (3 samples, 3.80%)</title><rect x="1085.4" y="323.0" width="44.9" height="15" fill="#38ce38" rx="2" ry="2"/>
+<text x="1088.4" y="334.0">jdk/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/management/internal/OperatingSystemImpl.getOpenFileDescriptorCount (3 samples, 3.80%)</title><rect x="1085.4" y="307.0" width="44.9" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="1088.4" y="318.0">com/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/management/internal/OperatingSystemImpl.getOpenFileDescriptorCount0 (3 samples, 3.80%)</title><rect x="1085.4" y="291.0" width="44.9" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="1088.4" y="302.0">com/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libc-2.19.so (deleted) (1 samples, 1.27%)</title><rect x="1085.4" y="275.0" width="15.0" height="15" fill="#e86161" rx="2" ry="2"/>
+<text x="1088.4" y="286.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>system_call_fast_compare_end (1 samples, 1.27%)</title><rect x="1085.4" y="259.0" width="15.0" height="15" fill="#e98500" rx="2" ry="2"/>
+<text x="1088.4" y="270.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>filldir (1 samples, 1.27%)</title><rect x="1085.4" y="243.0" width="15.0" height="15" fill="#d06c00" rx="2" ry="2"/>
+<text x="1088.4" y="254.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_getdents (1 samples, 1.27%)</title><rect x="1085.4" y="227.0" width="15.0" height="15" fill="#f08c00" rx="2" ry="2"/>
+<text x="1088.4" y="238.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>iterate_dir (1 samples, 1.27%)</title><rect x="1085.4" y="211.0" width="15.0" height="15" fill="#d06c00" rx="2" ry="2"/>
+<text x="1088.4" y="222.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>filldir (1 samples, 1.27%)</title><rect x="1085.4" y="195.0" width="15.0" height="15" fill="#d36f00" rx="2" ry="2"/>
+<text x="1088.4" y="206.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>proc_fd_instantiate (1 samples, 1.27%)</title><rect x="1085.4" y="179.0" width="15.0" height="15" fill="#ca6600" rx="2" ry="2"/>
+<text x="1088.4" y="190.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>proc_readfd_common (1 samples, 1.27%)</title><rect x="1085.4" y="163.0" width="15.0" height="15" fill="#fd9900" rx="2" ry="2"/>
+<text x="1088.4" y="174.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>proc_fill_cache (1 samples, 1.27%)</title><rect x="1085.4" y="147.0" width="15.0" height="15" fill="#be5a00" rx="2" ry="2"/>
+<text x="1088.4" y="158.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>d_lookup (1 samples, 1.27%)</title><rect x="1085.4" y="131.0" width="15.0" height="15" fill="#f38f00" rx="2" ry="2"/>
+<text x="1088.4" y="142.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>proc_fd_instantiate (1 samples, 1.27%)</title><rect x="1085.4" y="115.0" width="15.0" height="15" fill="#d36f00" rx="2" ry="2"/>
+<text x="1088.4" y="126.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__d_lookup (1 samples, 1.27%)</title><rect x="1085.4" y="99.0" width="15.0" height="15" fill="#ca6600" rx="2" ry="2"/>
+<text x="1088.4" y="110.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[unknown] (2 samples, 2.53%)</title><rect x="1100.4" y="275.0" width="29.9" height="15" fill="#e05454" rx="2" ry="2"/>
+<text x="1103.4" y="286.0">[u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libc-2.19.so (deleted) (2 samples, 2.53%)</title><rect x="1100.4" y="259.0" width="29.9" height="15" fill="#fc7e7e" rx="2" ry="2"/>
+<text x="1103.4" y="270.0">/l..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>system_call_fast_compare_end (2 samples, 2.53%)</title><rect x="1100.4" y="243.0" width="29.9" height="15" fill="#f99500" rx="2" ry="2"/>
+<text x="1103.4" y="254.0">sy..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>filldir (2 samples, 2.53%)</title><rect x="1100.4" y="227.0" width="29.9" height="15" fill="#ef8b00" rx="2" ry="2"/>
+<text x="1103.4" y="238.0">fi..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_getdents (2 samples, 2.53%)</title><rect x="1100.4" y="211.0" width="29.9" height="15" fill="#eb8700" rx="2" ry="2"/>
+<text x="1103.4" y="222.0">sy..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>iterate_dir (2 samples, 2.53%)</title><rect x="1100.4" y="195.0" width="29.9" height="15" fill="#c56100" rx="2" ry="2"/>
+<text x="1103.4" y="206.0">it..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>filldir (2 samples, 2.53%)</title><rect x="1100.4" y="179.0" width="29.9" height="15" fill="#ea8600" rx="2" ry="2"/>
+<text x="1103.4" y="190.0">fi..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>proc_fd_instantiate (2 samples, 2.53%)</title><rect x="1100.4" y="163.0" width="29.9" height="15" fill="#d67200" rx="2" ry="2"/>
+<text x="1103.4" y="174.0">pr..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>proc_readfd_common (2 samples, 2.53%)</title><rect x="1100.4" y="147.0" width="29.9" height="15" fill="#f08c00" rx="2" ry="2"/>
+<text x="1103.4" y="158.0">pr..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>proc_fill_cache (2 samples, 2.53%)</title><rect x="1100.4" y="131.0" width="29.9" height="15" fill="#fb9700" rx="2" ry="2"/>
+<text x="1103.4" y="142.0">pr..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>d_lookup (1 samples, 1.27%)</title><rect x="1115.3" y="115.0" width="15.0" height="15" fill="#f99500" rx="2" ry="2"/>
+<text x="1118.3" y="126.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>proc_fd_instantiate (1 samples, 1.27%)</title><rect x="1115.3" y="99.0" width="15.0" height="15" fill="#f69200" rx="2" ry="2"/>
+<text x="1118.3" y="110.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__d_lookup (1 samples, 1.27%)</title><rect x="1115.3" y="83.0" width="15.0" height="15" fill="#cb6700" rx="2" ry="2"/>
+<text x="1118.3" y="94.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>io/prometheus/client/hotspot/StandardExports.collectMemoryMetricsLinux (1 samples, 1.27%)</title><rect x="1130.3" y="403.0" width="14.9" height="15" fill="#61f361" rx="2" ry="2"/>
+<text x="1133.3" y="414.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/BufferedReader.readLine (1 samples, 1.27%)</title><rect x="1130.3" y="387.0" width="14.9" height="15" fill="#52e652" rx="2" ry="2"/>
+<text x="1133.3" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/BufferedReader.readLine (1 samples, 1.27%)</title><rect x="1130.3" y="371.0" width="14.9" height="15" fill="#43d843" rx="2" ry="2"/>
+<text x="1133.3" y="382.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/BufferedReader.fill (1 samples, 1.27%)</title><rect x="1130.3" y="355.0" width="14.9" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="1133.3" y="366.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/InputStreamReader.read (1 samples, 1.27%)</title><rect x="1130.3" y="339.0" width="14.9" height="15" fill="#68fa68" rx="2" ry="2"/>
+<text x="1133.3" y="350.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/cs/StreamDecoder.read (1 samples, 1.27%)</title><rect x="1130.3" y="323.0" width="14.9" height="15" fill="#66f866" rx="2" ry="2"/>
+<text x="1133.3" y="334.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/cs/StreamDecoder.implRead (1 samples, 1.27%)</title><rect x="1130.3" y="307.0" width="14.9" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="1133.3" y="318.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/cs/StreamDecoder.readBytes (1 samples, 1.27%)</title><rect x="1130.3" y="291.0" width="14.9" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="1133.3" y="302.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/FileInputStream.read (1 samples, 1.27%)</title><rect x="1130.3" y="275.0" width="14.9" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="1133.3" y="286.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/FileInputStream.readBytes (1 samples, 1.27%)</title><rect x="1130.3" y="259.0" width="14.9" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="1133.3" y="270.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[unknown] (1 samples, 1.27%)</title><rect x="1130.3" y="243.0" width="14.9" height="15" fill="#f77777" rx="2" ry="2"/>
+<text x="1133.3" y="254.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[unknown] (1 samples, 1.27%)</title><rect x="1130.3" y="227.0" width="14.9" height="15" fill="#e35959" rx="2" ry="2"/>
+<text x="1133.3" y="238.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[unknown] (1 samples, 1.27%)</title><rect x="1130.3" y="211.0" width="14.9" height="15" fill="#e15757" rx="2" ry="2"/>
+<text x="1133.3" y="222.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.27%)</title><rect x="1130.3" y="195.0" width="14.9" height="15" fill="#f67575" rx="2" ry="2"/>
+<text x="1133.3" y="206.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>system_call_fast_compare_end (1 samples, 1.27%)</title><rect x="1130.3" y="179.0" width="14.9" height="15" fill="#de7a00" rx="2" ry="2"/>
+<text x="1133.3" y="190.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_read (1 samples, 1.27%)</title><rect x="1130.3" y="163.0" width="14.9" height="15" fill="#d06c00" rx="2" ry="2"/>
+<text x="1133.3" y="174.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>vfs_read (1 samples, 1.27%)</title><rect x="1130.3" y="147.0" width="14.9" height="15" fill="#c96500" rx="2" ry="2"/>
+<text x="1133.3" y="158.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>seq_read (1 samples, 1.27%)</title><rect x="1130.3" y="131.0" width="14.9" height="15" fill="#ea8600" rx="2" ry="2"/>
+<text x="1133.3" y="142.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>proc_single_show (1 samples, 1.27%)</title><rect x="1130.3" y="115.0" width="14.9" height="15" fill="#ed8900" rx="2" ry="2"/>
+<text x="1133.3" y="126.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>proc_pid_status (1 samples, 1.27%)</title><rect x="1130.3" y="99.0" width="14.9" height="15" fill="#c76300" rx="2" ry="2"/>
+<text x="1133.3" y="110.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>render_sigset_t (1 samples, 1.27%)</title><rect x="1130.3" y="83.0" width="14.9" height="15" fill="#e58100" rx="2" ry="2"/>
+<text x="1133.3" y="94.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>seq_printf (1 samples, 1.27%)</title><rect x="1130.3" y="67.0" width="14.9" height="15" fill="#de7a00" rx="2" ry="2"/>
+<text x="1133.3" y="78.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>seq_vprintf (1 samples, 1.27%)</title><rect x="1130.3" y="51.0" width="14.9" height="15" fill="#f49000" rx="2" ry="2"/>
+<text x="1133.3" y="62.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>vsnprintf (1 samples, 1.27%)</title><rect x="1130.3" y="35.0" width="14.9" height="15" fill="#ed8900" rx="2" ry="2"/>
+<text x="1133.3" y="46.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/coyote/http11/Http11InputBuffer.parseRequestLine (1 samples, 1.27%)</title><rect x="1145.2" y="979.0" width="14.9" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="1148.2" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/coyote/http11/Http11InputBuffer.fill (1 samples, 1.27%)</title><rect x="1145.2" y="963.0" width="14.9" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1148.2" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/tomcat/util/net/NioEndpoint$NioSocketWrapper.read (1 samples, 1.27%)</title><rect x="1145.2" y="947.0" width="14.9" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="1148.2" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/tomcat/util/net/NioEndpoint$NioSocketWrapper.fillReadBuffer (1 samples, 1.27%)</title><rect x="1145.2" y="931.0" width="14.9" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="1148.2" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/tomcat/util/net/NioChannel.read (1 samples, 1.27%)</title><rect x="1145.2" y="915.0" width="14.9" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="1148.2" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SocketChannelImpl.read (1 samples, 1.27%)</title><rect x="1145.2" y="899.0" width="14.9" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="1148.2" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/IOUtil.read (1 samples, 1.27%)</title><rect x="1145.2" y="883.0" width="14.9" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="1148.2" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/IOUtil.read (1 samples, 1.27%)</title><rect x="1145.2" y="867.0" width="14.9" height="15" fill="#69fb69" rx="2" ry="2"/>
+<text x="1148.2" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/IOUtil.readIntoNativeBuffer (1 samples, 1.27%)</title><rect x="1145.2" y="851.0" width="14.9" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="1148.2" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SocketDispatcher.read (1 samples, 1.27%)</title><rect x="1145.2" y="835.0" width="14.9" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="1148.2" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/FileDispatcherImpl.read0 (1 samples, 1.27%)</title><rect x="1145.2" y="819.0" width="14.9" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="1148.2" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[unknown] (1 samples, 1.27%)</title><rect x="1145.2" y="803.0" width="14.9" height="15" fill="#f47373" rx="2" ry="2"/>
+<text x="1148.2" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.27%)</title><rect x="1145.2" y="787.0" width="14.9" height="15" fill="#e35959" rx="2" ry="2"/>
+<text x="1148.2" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>system_call_fast_compare_end (1 samples, 1.27%)</title><rect x="1145.2" y="771.0" width="14.9" height="15" fill="#d36f00" rx="2" ry="2"/>
+<text x="1148.2" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_read (1 samples, 1.27%)</title><rect x="1145.2" y="755.0" width="14.9" height="15" fill="#d77300" rx="2" ry="2"/>
+<text x="1148.2" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>vfs_read (1 samples, 1.27%)</title><rect x="1145.2" y="739.0" width="14.9" height="15" fill="#e88400" rx="2" ry="2"/>
+<text x="1148.2" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>new_sync_read (1 samples, 1.27%)</title><rect x="1145.2" y="723.0" width="14.9" height="15" fill="#e58100" rx="2" ry="2"/>
+<text x="1148.2" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sock_read_iter (1 samples, 1.27%)</title><rect x="1145.2" y="707.0" width="14.9" height="15" fill="#ce6a00" rx="2" ry="2"/>
+<text x="1148.2" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sock_recvmsg (1 samples, 1.27%)</title><rect x="1145.2" y="691.0" width="14.9" height="15" fill="#c76300" rx="2" ry="2"/>
+<text x="1148.2" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>security_socket_recvmsg (1 samples, 1.27%)</title><rect x="1145.2" y="675.0" width="14.9" height="15" fill="#c25e00" rx="2" ry="2"/>
+<text x="1148.2" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/jboss/netty/util/ThreadRenamingRunnable.run (2 samples, 2.53%)</title><rect x="1160.1" y="1107.0" width="29.9" height="15" fill="#38cd38" rx="2" ry="2"/>
+<text x="1163.1" y="1118.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/jboss/netty/util/HashedWheelTimer$Worker.run (2 samples, 2.53%)</title><rect x="1160.1" y="1091.0" width="29.9" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="1163.1" y="1102.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/jboss/netty/util/HashedWheelTimer$Worker.waitForNextTick (2 samples, 2.53%)</title><rect x="1160.1" y="1075.0" width="29.9" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="1163.1" y="1086.0">or..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Thread.sleep (2 samples, 2.53%)</title><rect x="1160.1" y="1059.0" width="29.9" height="15" fill="#43d743" rx="2" ry="2"/>
+<text x="1163.1" y="1070.0">ja..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[unknown] (1 samples, 1.27%)</title><rect x="1160.1" y="1043.0" width="15.0" height="15" fill="#da4c4c" rx="2" ry="2"/>
+<text x="1163.1" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>os::sleep(Thread*, long, bool) (1 samples, 1.27%)</title><rect x="1160.1" y="1027.0" width="15.0" height="15" fill="#b4b433" rx="2" ry="2"/>
+<text x="1163.1" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.27%)</title><rect x="1160.1" y="1011.0" width="15.0" height="15" fill="#df5454" rx="2" ry="2"/>
+<text x="1163.1" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>system_call_fast_compare_end (1 samples, 1.27%)</title><rect x="1160.1" y="995.0" width="15.0" height="15" fill="#fa9600" rx="2" ry="2"/>
+<text x="1163.1" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>exit_to_usermode_loop (1 samples, 1.27%)</title><rect x="1160.1" y="979.0" width="15.0" height="15" fill="#e37f00" rx="2" ry="2"/>
+<text x="1163.1" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (1 samples, 1.27%)</title><rect x="1160.1" y="963.0" width="15.0" height="15" fill="#cf6b00" rx="2" ry="2"/>
+<text x="1163.1" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__perf_event_enable (1 samples, 1.27%)</title><rect x="1160.1" y="947.0" width="15.0" height="15" fill="#e88400" rx="2" ry="2"/>
+<text x="1163.1" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_futex (1 samples, 1.27%)</title><rect x="1160.1" y="931.0" width="15.0" height="15" fill="#ef8b00" rx="2" ry="2"/>
+<text x="1163.1" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hrtimer_wakeup (1 samples, 1.27%)</title><rect x="1160.1" y="915.0" width="15.0" height="15" fill="#dd7900" rx="2" ry="2"/>
+<text x="1163.1" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wait (1 samples, 1.27%)</title><rect x="1160.1" y="899.0" width="15.0" height="15" fill="#c86400" rx="2" ry="2"/>
+<text x="1163.1" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wait_queue_me (1 samples, 1.27%)</title><rect x="1160.1" y="883.0" width="15.0" height="15" fill="#f79300" rx="2" ry="2"/>
+<text x="1163.1" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hrtimer_start_range_ns (1 samples, 1.27%)</title><rect x="1160.1" y="867.0" width="15.0" height="15" fill="#e68200" rx="2" ry="2"/>
+<text x="1163.1" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__lock_text_start (1 samples, 1.27%)</title><rect x="1160.1" y="851.0" width="15.0" height="15" fill="#df7b00" rx="2" ry="2"/>
+<text x="1163.1" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>os::sleep(Thread*, long, bool) (1 samples, 1.27%)</title><rect x="1175.1" y="1043.0" width="14.9" height="15" fill="#baba36" rx="2" ry="2"/>
+<text x="1178.1" y="1054.0"></text>
+</g>
+</svg>
