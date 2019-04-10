@@ -1,0 +1,2903 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1200" height="1190" onload="init(evt)" viewBox="0 0 1200 1190" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<style type="text/css">
+	text { font-family:Verdana; font-size:12px; fill:black; }
+	.func_g:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	var details, searchbtn, matchedtxt, svg;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+	}
+
+	// mouse-over for info
+	function s(node) {		// show
+		info = g_to_text(node);
+		details.nodeValue = "Function: " + info;
+	}
+	function c() {			// clear
+		details.nodeValue = ' ';
+	}
+
+	// ctrl-F for search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+	})
+
+	// functions
+	function find_child(parent, name, attr) {
+		var children = parent.childNodes;
+		for (var i=0; i<children.length;i++) {
+			if (children[i].tagName == name)
+				return (attr != undefined) ? children[i].attributes[attr].value : children[i];
+		}
+		return;
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_"+attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_"+attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_"+attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		// if there's any manipulation we want to do to the function
+		// name before it's searched, do it here before returning.
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes["width"].value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes["x"].value = parseFloat(r.attributes["x"].value) +3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2*12*0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		// Fit in full text width
+		if (/^ *$/.test(txt) || t.getSubStringLength(0, txt.length) < w)
+			return;
+
+		for (var x=txt.length-2; x>0; x--) {
+			if (t.getSubStringLength(0, x+2) <= w) {
+				t.textContent = txt.substring(0,x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = (parseFloat(e.attributes["x"].value) - x - 10) * ratio + 10;
+				if(e.tagName == "text") e.attributes["x"].value = find_child(e.parentNode, "rect", "x") + 3;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseFloat(e.attributes["width"].value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_child(c[i], x-10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes["x"] != undefined) {
+				orig_save(e, "x");
+				e.attributes["x"].value = 10;
+			}
+			if (e.attributes["width"] != undefined) {
+				orig_save(e, "width");
+				e.attributes["width"].value = parseInt(svg.width.baseVal.value) - (10*2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for(var i=0, c=e.childNodes; i<c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr["width"].value);
+		var xmin = parseFloat(attr["x"].value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr["y"].value);
+		var ratio = (svg.width.baseVal.value - 2*10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "1.0";
+
+		var el = document.getElementsByTagName("g");
+		for(var i=0;i<el.length;i++){
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a["x"].value);
+			var ew = parseFloat(a["width"].value);
+			// Is it an ancestor
+			if (0 == 0) {
+				var upstack = parseFloat(a["y"].value) > ymin;
+			} else {
+				var upstack = parseFloat(a["y"].value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.style["opacity"] = "0.5";
+					zoom_parent(e);
+					e.onclick = function(e){unzoom(); zoom(this);};
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.style["display"] = "none";
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.style["display"] = "none";
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					e.onclick = function(e){zoom(this);};
+					update_text(e);
+				}
+			}
+		}
+	}
+	function unzoom() {
+		var unzoombtn = document.getElementById("unzoom");
+		unzoombtn.style["opacity"] = "0.0";
+
+		var el = document.getElementsByTagName("g");
+		for(i=0;i<el.length;i++) {
+			el[i].style["display"] = "block";
+			el[i].style["opacity"] = "1";
+			zoom_reset(el[i]);
+			update_text(el[i]);
+		}
+	}
+
+	// search
+	function reset_search() {
+		var el = document.getElementsByTagName("rect");
+		for (var i=0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)", "");
+			if (term != null) {
+				search(term)
+			}
+		} else {
+			reset_search();
+			searching = 0;
+			searchbtn.style["opacity"] = "0.1";
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.style["opacity"] = "0.0";
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		var re = new RegExp(term);
+		var el = document.getElementsByTagName("g");
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			if (e.attributes["class"].value != "func_g")
+				continue;
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (rect == null) {
+				// the rect might be wrapped in an anchor
+				// if nameattr href is being used
+				if (rect = find_child(e, "a")) {
+				    rect = find_child(r, "rect");
+				}
+			}
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes["width"].value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes["x"].value);
+				orig_save(rect, "fill");
+				rect.attributes["fill"].value =
+				    "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+
+		searchbtn.style["opacity"] = "1.0";
+		searchbtn.firstChild.nodeValue = "Reset Search"
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+			return a - b;
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		var fudge = 0.0001;	// JavaScript floating point
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw - fudge) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.style["opacity"] = "1.0";
+		pct = 100 * count / maxwidth;
+		if (pct == 100)
+			pct = "100"
+		else
+			pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+	function searchover(e) {
+		searchbtn.style["opacity"] = "1.0";
+	}
+	function searchout(e) {
+		if (searching) {
+			searchbtn.style["opacity"] = "1.0";
+		} else {
+			searchbtn.style["opacity"] = "0.1";
+		}
+	}
+]]>
+</script>
+<rect x="0" y="0" width="100%" height="100%" fill="rgb(240,240,220)"/>
+<text x="600" y="24" text-anchor="middle" style="font-size:17px">Flame Graph</text>
+<text x="10" y="1173" id="details"> </text>
+<text x="10" y="24" id="unzoom" onclick="unzoom()" style="opacity:0.0;cursor:pointer">Reset Zoom</text>
+<text x="1090" y="24" id="search" onmouseover="searchover()" onmouseout="searchout()" onclick="search_prompt()" style="opacity:0.1;cursor:pointer">Search</text>
+<text x="1090" y="1173" id="matched"> </text>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>all (57 samples, 100.00%)</title><rect x="10.0" y="1139.0" width="1180.0" height="15" fill="#f67575" rx="2" ry="2"/>
+<text x="13.0" y="1150.0">all</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (21 samples, 36.84%)</title><rect x="10.0" y="1123.0" width="434.7" height="15" fill="#dd5151" rx="2" ry="2"/>
+<text x="13.0" y="1134.0">/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted)</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java_start(Thread*) (21 samples, 36.84%)</title><rect x="10.0" y="1107.0" width="434.7" height="15" fill="#f37070" rx="2" ry="2"/>
+<text x="13.0" y="1118.0">java_start(Thread*)</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GangWorker::loop() (13 samples, 22.81%)</title><rect x="10.0" y="1091.0" width="269.1" height="15" fill="#dada41" rx="2" ry="2"/>
+<text x="13.0" y="1102.0">GangWorker::loop()</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ParNewGenTask::work(unsigned int) (13 samples, 22.81%)</title><rect x="10.0" y="1075.0" width="269.1" height="15" fill="#e1e144" rx="2" ry="2"/>
+<text x="13.0" y="1086.0">ParNewGenTask::work(unsigned int)</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ParEvacuateFollowersClosure::do_void() (13 samples, 22.81%)</title><rect x="10.0" y="1059.0" width="269.1" height="15" fill="#b9b935" rx="2" ry="2"/>
+<text x="13.0" y="1070.0">ParEvacuateFollowersClosure::do_void()</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ParallelTaskTerminator::offer_termination(TerminatorTerminator*) (4 samples, 7.02%)</title><rect x="10.0" y="1043.0" width="82.8" height="15" fill="#c1c138" rx="2" ry="2"/>
+<text x="13.0" y="1054.0">ParallelT..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>SpinPause (9 samples, 15.79%)</title><rect x="92.8" y="1043.0" width="186.3" height="15" fill="#f26f6f" rx="2" ry="2"/>
+<text x="95.8" y="1054.0">SpinPause</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>VMThread::run() (2 samples, 3.51%)</title><rect x="279.1" y="1091.0" width="41.4" height="15" fill="#bebe37" rx="2" ry="2"/>
+<text x="282.1" y="1102.0">VMT..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>VMThread::loop() (2 samples, 3.51%)</title><rect x="279.1" y="1075.0" width="41.4" height="15" fill="#cdcd3d" rx="2" ry="2"/>
+<text x="282.1" y="1086.0">VMT..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>VMThread::evaluate_operation(VM_Operation*) (2 samples, 3.51%)</title><rect x="279.1" y="1059.0" width="41.4" height="15" fill="#c9c93b" rx="2" ry="2"/>
+<text x="282.1" y="1070.0">VMT..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>VM_Operation::evaluate() (2 samples, 3.51%)</title><rect x="279.1" y="1043.0" width="41.4" height="15" fill="#d1d13e" rx="2" ry="2"/>
+<text x="282.1" y="1054.0">VM_..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>VM_GenCollectForAllocation::doit() (2 samples, 3.51%)</title><rect x="279.1" y="1027.0" width="41.4" height="15" fill="#c3c339" rx="2" ry="2"/>
+<text x="282.1" y="1038.0">VM_..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GenCollectorPolicy::satisfy_failed_allocation(unsigned long, bool) (2 samples, 3.51%)</title><rect x="279.1" y="1011.0" width="41.4" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="282.1" y="1022.0">Gen..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GenCollectedHeap::do_collection(bool, bool, unsigned long, bool, int) (2 samples, 3.51%)</title><rect x="279.1" y="995.0" width="41.4" height="15" fill="#e3e345" rx="2" ry="2"/>
+<text x="282.1" y="1006.0">Gen..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ParNewGeneration::collect(bool, bool, unsigned long, bool) (2 samples, 3.51%)</title><rect x="279.1" y="979.0" width="41.4" height="15" fill="#e1e144" rx="2" ry="2"/>
+<text x="282.1" y="990.0">Par..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ReferenceProcessor::process_discovered_references(BoolObjectClosure*, OopClosure*, VoidClosure*, AbstractRefProcTaskExecutor*, GCTimer*, GCId) (1 samples, 1.75%)</title><rect x="279.1" y="963.0" width="20.7" height="15" fill="#d1d13e" rx="2" ry="2"/>
+<text x="282.1" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ReferenceProcessor::process_discovered_reflist(DiscoveredList*, ReferencePolicy*, bool, BoolObjectClosure*, OopClosure*, VoidClosure*, AbstractRefProcTaskExecutor*) (1 samples, 1.75%)</title><rect x="279.1" y="947.0" width="20.7" height="15" fill="#d6d640" rx="2" ry="2"/>
+<text x="282.1" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ReferenceProcessor::process_phase3(DiscoveredList&amp;, bool, BoolObjectClosure*, OopClosure*, VoidClosure*) (1 samples, 1.75%)</title><rect x="279.1" y="931.0" width="20.7" height="15" fill="#b6b634" rx="2" ry="2"/>
+<text x="282.1" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>EvacuateFollowersClosureGeneral::do_void() (1 samples, 1.75%)</title><rect x="279.1" y="915.0" width="20.7" height="15" fill="#d0d03e" rx="2" ry="2"/>
+<text x="282.1" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>GenCollectedHeap::oop_since_save_marks_iterate(int, OopsInGenClosure*, OopsInGenClosure*) (1 samples, 1.75%)</title><rect x="279.1" y="899.0" width="20.7" height="15" fill="#afaf32" rx="2" ry="2"/>
+<text x="282.1" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>DefNewGeneration::oop_since_save_marks_iterate_v(OopsInGenClosure*) (1 samples, 1.75%)</title><rect x="279.1" y="883.0" width="20.7" height="15" fill="#bcbc36" rx="2" ry="2"/>
+<text x="282.1" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ContiguousSpace::oop_since_save_marks_iterate_v(OopsInGenClosure*) (1 samples, 1.75%)</title><rect x="279.1" y="867.0" width="20.7" height="15" fill="#b6b634" rx="2" ry="2"/>
+<text x="282.1" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ObjArrayKlass::oop_oop_iterate_v(oopDesc*, ExtendedOopClosure*) (1 samples, 1.75%)</title><rect x="279.1" y="851.0" width="20.7" height="15" fill="#dbdb42" rx="2" ry="2"/>
+<text x="282.1" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>nmethod::oops_do_marking_epilogue() (1 samples, 1.75%)</title><rect x="299.8" y="963.0" width="20.7" height="15" fill="#b7b735" rx="2" ry="2"/>
+<text x="302.8" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>WatcherThread::run() (6 samples, 10.53%)</title><rect x="320.5" y="1091.0" width="124.2" height="15" fill="#c5c53a" rx="2" ry="2"/>
+<text x="323.5" y="1102.0">WatcherThread::..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>WatcherThread::sleep() const (6 samples, 10.53%)</title><rect x="320.5" y="1075.0" width="124.2" height="15" fill="#b6b634" rx="2" ry="2"/>
+<text x="323.5" y="1086.0">WatcherThread::..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libc-2.19.so (deleted) (1 samples, 1.75%)</title><rect x="320.5" y="1059.0" width="20.7" height="15" fill="#cd3a3a" rx="2" ry="2"/>
+<text x="323.5" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__vdso_clock_gettime (1 samples, 1.75%)</title><rect x="320.5" y="1043.0" width="20.7" height="15" fill="#fe8181" rx="2" ry="2"/>
+<text x="323.5" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Monitor::wait(bool, long, bool) (5 samples, 8.77%)</title><rect x="341.2" y="1059.0" width="103.5" height="15" fill="#bbbb36" rx="2" ry="2"/>
+<text x="344.2" y="1070.0">Monitor::wai..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Monitor::IWait(Thread*, long) (4 samples, 7.02%)</title><rect x="341.2" y="1043.0" width="82.8" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="344.2" y="1054.0">Monitor::..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (3 samples, 5.26%)</title><rect x="341.2" y="1027.0" width="62.1" height="15" fill="#f67575" rx="2" ry="2"/>
+<text x="344.2" y="1038.0">/lib/x..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 1.75%)</title><rect x="382.6" y="1011.0" width="20.7" height="15" fill="#e58100" rx="2" ry="2"/>
+<text x="385.6" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (1 samples, 1.75%)</title><rect x="382.6" y="995.0" width="20.7" height="15" fill="#d16d00" rx="2" ry="2"/>
+<text x="385.6" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (1 samples, 1.75%)</title><rect x="382.6" y="979.0" width="20.7" height="15" fill="#e78300" rx="2" ry="2"/>
+<text x="385.6" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>handle_mm_fault (1 samples, 1.75%)</title><rect x="382.6" y="963.0" width="20.7" height="15" fill="#e07c00" rx="2" ry="2"/>
+<text x="385.6" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__perf_event_enable (1 samples, 1.75%)</title><rect x="382.6" y="947.0" width="20.7" height="15" fill="#de7a00" rx="2" ry="2"/>
+<text x="385.6" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_futex (1 samples, 1.75%)</title><rect x="382.6" y="931.0" width="20.7" height="15" fill="#fd9900" rx="2" ry="2"/>
+<text x="385.6" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wake (1 samples, 1.75%)</title><rect x="382.6" y="915.0" width="20.7" height="15" fill="#d16d00" rx="2" ry="2"/>
+<text x="385.6" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_init (1 samples, 1.75%)</title><rect x="403.3" y="1027.0" width="20.7" height="15" fill="#f26f6f" rx="2" ry="2"/>
+<text x="406.3" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Thread::muxRelease(long volatile*) (1 samples, 1.75%)</title><rect x="424.0" y="1043.0" width="20.7" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="427.0" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/google/code/yanf4j/nio/impl/Reactor.run (2 samples, 3.51%)</title><rect x="444.7" y="1123.0" width="41.4" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="447.7" y="1134.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/google/code/yanf4j/nio/impl/Reactor.dispatchEvent (2 samples, 3.51%)</title><rect x="444.7" y="1107.0" width="41.4" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="447.7" y="1118.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/google/code/yanf4j/core/impl/AbstractController.notifyException (1 samples, 1.75%)</title><rect x="444.7" y="1091.0" width="20.7" height="15" fill="#67f967" rx="2" ry="2"/>
+<text x="447.7" y="1102.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>net/rubyeye/xmemcached/impl/MemcachedConnector$InnerControllerStateListener.onException (1 samples, 1.75%)</title><rect x="444.7" y="1075.0" width="20.7" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="447.7" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/Logger.error (1 samples, 1.75%)</title><rect x="444.7" y="1059.0" width="20.7" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="447.7" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/Logger.filterAndLog_0_Or3Plus (1 samples, 1.75%)</title><rect x="444.7" y="1043.0" width="20.7" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="447.7" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/Logger.buildLoggingEventAndAppend (1 samples, 1.75%)</title><rect x="444.7" y="1027.0" width="20.7" height="15" fill="#69fa69" rx="2" ry="2"/>
+<text x="447.7" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/spi/LoggingEvent.&lt;init&gt; (1 samples, 1.75%)</title><rect x="444.7" y="1011.0" width="20.7" height="15" fill="#36cb36" rx="2" ry="2"/>
+<text x="447.7" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/spi/ThrowableProxy.calculatePackagingData (1 samples, 1.75%)</title><rect x="444.7" y="995.0" width="20.7" height="15" fill="#6afc6a" rx="2" ry="2"/>
+<text x="447.7" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/spi/PackagingDataCalculator.calculate (1 samples, 1.75%)</title><rect x="444.7" y="979.0" width="20.7" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="447.7" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/spi/PackagingDataCalculator.populateFrames (1 samples, 1.75%)</title><rect x="444.7" y="963.0" width="20.7" height="15" fill="#37cc37" rx="2" ry="2"/>
+<text x="447.7" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Throwable.getStackTrace (1 samples, 1.75%)</title><rect x="444.7" y="947.0" width="20.7" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="447.7" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Throwable.getOurStackTrace (1 samples, 1.75%)</title><rect x="444.7" y="931.0" width="20.7" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="447.7" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Throwable.getStackTraceElement (1 samples, 1.75%)</title><rect x="444.7" y="915.0" width="20.7" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="447.7" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>JVM_GetStackTraceElement (1 samples, 1.75%)</title><rect x="444.7" y="899.0" width="20.7" height="15" fill="#db4d4d" rx="2" ry="2"/>
+<text x="447.7" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java_lang_Throwable::get_stack_trace_element(oopDesc*, int, Thread*) (1 samples, 1.75%)</title><rect x="444.7" y="883.0" width="20.7" height="15" fill="#b2b233" rx="2" ry="2"/>
+<text x="447.7" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java_lang_StackTraceElement::create(Handle, int, int, int, int, Thread*) (1 samples, 1.75%)</title><rect x="444.7" y="867.0" width="20.7" height="15" fill="#b0b032" rx="2" ry="2"/>
+<text x="447.7" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>StringTable::intern(char const*, Thread*) (1 samples, 1.75%)</title><rect x="444.7" y="851.0" width="20.7" height="15" fill="#c8c83b" rx="2" ry="2"/>
+<text x="447.7" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>UTF8::unicode_length(char const*) (1 samples, 1.75%)</title><rect x="444.7" y="835.0" width="20.7" height="15" fill="#b2b233" rx="2" ry="2"/>
+<text x="447.7" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>net/rubyeye/xmemcached/impl/MemcachedConnector.onConnect (1 samples, 1.75%)</title><rect x="465.4" y="1091.0" width="20.7" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="468.4" y="1102.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SocketChannelImpl.finishConnect (1 samples, 1.75%)</title><rect x="465.4" y="1075.0" width="20.7" height="15" fill="#6cfd6c" rx="2" ry="2"/>
+<text x="468.4" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SocketChannelImpl.checkConnect (1 samples, 1.75%)</title><rect x="465.4" y="1059.0" width="20.7" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="468.4" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Java_sun_nio_ch_SocketChannelImpl_checkConnect (1 samples, 1.75%)</title><rect x="465.4" y="1043.0" width="20.7" height="15" fill="#f67676" rx="2" ry="2"/>
+<text x="468.4" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>handleSocketError (1 samples, 1.75%)</title><rect x="465.4" y="1027.0" width="20.7" height="15" fill="#d64747" rx="2" ry="2"/>
+<text x="468.4" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>JNU_ThrowByNameWithLastError (1 samples, 1.75%)</title><rect x="465.4" y="1011.0" width="20.7" height="15" fill="#e55d5d" rx="2" ry="2"/>
+<text x="468.4" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>JNU_NewStringPlatform (1 samples, 1.75%)</title><rect x="465.4" y="995.0" width="20.7" height="15" fill="#dc5050" rx="2" ry="2"/>
+<text x="468.4" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jni_NewObject (1 samples, 1.75%)</title><rect x="465.4" y="979.0" width="20.7" height="15" fill="#f16e6e" rx="2" ry="2"/>
+<text x="468.4" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jni_invoke_nonstatic(JNIEnv_*, JavaValue*, _jobject*, JNICallType, _jmethodID*, JNI_ArgumentPusher*, Thread*) (1 samples, 1.75%)</title><rect x="465.4" y="963.0" width="20.7" height="15" fill="#e45b5b" rx="2" ry="2"/>
+<text x="468.4" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/AbandonedConnectionCleanupThread.run (3 samples, 5.26%)</title><rect x="486.1" y="1123.0" width="62.1" height="15" fill="#5aec5a" rx="2" ry="2"/>
+<text x="489.1" y="1134.0">com/my..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/ref/ReferenceQueue.remove (3 samples, 5.26%)</title><rect x="486.1" y="1107.0" width="62.1" height="15" fill="#51e551" rx="2" ry="2"/>
+<text x="489.1" y="1118.0">java/l..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Object.wait (3 samples, 5.26%)</title><rect x="486.1" y="1091.0" width="62.1" height="15" fill="#34ca34" rx="2" ry="2"/>
+<text x="489.1" y="1102.0">java/l..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>JVM_MonitorWait (3 samples, 5.26%)</title><rect x="486.1" y="1075.0" width="62.1" height="15" fill="#e05555" rx="2" ry="2"/>
+<text x="489.1" y="1086.0">JVM_Mo..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ObjectMonitor::wait(long, bool, Thread*) (3 samples, 5.26%)</title><rect x="486.1" y="1059.0" width="62.1" height="15" fill="#e2e244" rx="2" ry="2"/>
+<text x="489.1" y="1070.0">Object..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.75%)</title><rect x="506.8" y="1043.0" width="20.7" height="15" fill="#fb7c7c" rx="2" ry="2"/>
+<text x="509.8" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 1.75%)</title><rect x="506.8" y="1027.0" width="20.7" height="15" fill="#ec8800" rx="2" ry="2"/>
+<text x="509.8" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (1 samples, 1.75%)</title><rect x="506.8" y="1011.0" width="20.7" height="15" fill="#d06c00" rx="2" ry="2"/>
+<text x="509.8" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (1 samples, 1.75%)</title><rect x="506.8" y="995.0" width="20.7" height="15" fill="#ee8a00" rx="2" ry="2"/>
+<text x="509.8" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__perf_event_enable (1 samples, 1.75%)</title><rect x="506.8" y="979.0" width="20.7" height="15" fill="#e78300" rx="2" ry="2"/>
+<text x="509.8" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_futex (1 samples, 1.75%)</title><rect x="506.8" y="963.0" width="20.7" height="15" fill="#d57100" rx="2" ry="2"/>
+<text x="509.8" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wake (1 samples, 1.75%)</title><rect x="506.8" y="947.0" width="20.7" height="15" fill="#ea8600" rx="2" ry="2"/>
+<text x="509.8" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__irqentry_text_start (1 samples, 1.75%)</title><rect x="506.8" y="931.0" width="20.7" height="15" fill="#c86400" rx="2" ry="2"/>
+<text x="509.8" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>smp_apic_timer_interrupt (1 samples, 1.75%)</title><rect x="506.8" y="915.0" width="20.7" height="15" fill="#da7600" rx="2" ry="2"/>
+<text x="509.8" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>irq_exit (1 samples, 1.75%)</title><rect x="506.8" y="899.0" width="20.7" height="15" fill="#f79300" rx="2" ry="2"/>
+<text x="509.8" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__softirqentry_text_start (1 samples, 1.75%)</title><rect x="506.8" y="883.0" width="20.7" height="15" fill="#f38f00" rx="2" ry="2"/>
+<text x="509.8" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>rebalance_domains (1 samples, 1.75%)</title><rect x="506.8" y="867.0" width="20.7" height="15" fill="#d36f00" rx="2" ry="2"/>
+<text x="509.8" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_raw_spin_unlock_irqrestore (1 samples, 1.75%)</title><rect x="506.8" y="851.0" width="20.7" height="15" fill="#cc6800" rx="2" ry="2"/>
+<text x="509.8" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ObjectMonitor::DeferredInitialize() (1 samples, 1.75%)</title><rect x="527.5" y="1043.0" width="20.7" height="15" fill="#e0e043" rx="2" ry="2"/>
+<text x="530.5" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Thread.run (10 samples, 17.54%)</title><rect x="548.2" y="1123.0" width="207.1" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="551.2" y="1134.0">java/lang/Thread.run</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl$$Lambda$84/715763457.run (1 samples, 1.75%)</title><rect x="548.2" y="1107.0" width="20.7" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="551.2" y="1118.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.lambda$resetAppIndexFollow$260 (1 samples, 1.75%)</title><rect x="548.2" y="1091.0" width="20.7" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="551.2" y="1102.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.setFollowNewestSerialize (1 samples, 1.75%)</title><rect x="548.2" y="1075.0" width="20.7" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="551.2" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/common/mao/BaseMao.set (1 samples, 1.75%)</title><rect x="548.2" y="1059.0" width="20.7" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="551.2" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl$$Lambda$85/1027210548.call (1 samples, 1.75%)</title><rect x="548.2" y="1043.0" width="20.7" height="15" fill="#65f765" rx="2" ry="2"/>
+<text x="551.2" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.lambda$reloadFollowNewestSerialize$267 (1 samples, 1.75%)</title><rect x="548.2" y="1027.0" width="20.7" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="551.2" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/stream/ReferencePipeline$Head.forEach (1 samples, 1.75%)</title><rect x="548.2" y="1011.0" width="20.7" height="15" fill="#69fa69" rx="2" ry="2"/>
+<text x="551.2" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/ArrayList$ArrayListSpliterator.forEachRemaining (1 samples, 1.75%)</title><rect x="548.2" y="995.0" width="20.7" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="551.2" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl$$Lambda$86/1397892041.accept (1 samples, 1.75%)</title><rect x="548.2" y="979.0" width="20.7" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="551.2" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.lambda$null$265 (1 samples, 1.75%)</title><rect x="548.2" y="963.0" width="20.7" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="551.2" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.getAppSeasonBeanInList (1 samples, 1.75%)</title><rect x="548.2" y="947.0" width="20.7" height="15" fill="#68fa68" rx="2" ry="2"/>
+<text x="551.2" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/common/mao/BaseMao.get (1 samples, 1.75%)</title><rect x="548.2" y="931.0" width="20.7" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="551.2" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl$$Lambda$87/110648669.call (1 samples, 1.75%)</title><rect x="548.2" y="915.0" width="20.7" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="551.2" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.lambda$getAppSeasonBeanInList$228 (1 samples, 1.75%)</title><rect x="548.2" y="899.0" width="20.7" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="551.2" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/core/season/dao/impl/SeasonV2DaoImpl.getAppSeasonInfoInList (1 samples, 1.75%)</title><rect x="548.2" y="883.0" width="20.7" height="15" fill="#69fa69" rx="2" ry="2"/>
+<text x="551.2" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy69.getSeason2Info (1 samples, 1.75%)</title><rect x="548.2" y="867.0" width="20.7" height="15" fill="#3ad03a" rx="2" ry="2"/>
+<text x="551.2" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/binding/MapperProxy.invoke (1 samples, 1.75%)</title><rect x="548.2" y="851.0" width="20.7" height="15" fill="#66f866" rx="2" ry="2"/>
+<text x="551.2" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/binding/MapperMethod.execute (1 samples, 1.75%)</title><rect x="548.2" y="835.0" width="20.7" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="551.2" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/mybatis/spring/SqlSessionTemplate.selectOne (1 samples, 1.75%)</title><rect x="548.2" y="819.0" width="20.7" height="15" fill="#4bdf4b" rx="2" ry="2"/>
+<text x="551.2" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy48.selectOne (1 samples, 1.75%)</title><rect x="548.2" y="803.0" width="20.7" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="551.2" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/mybatis/spring/SqlSessionTemplate$SqlSessionInterceptor.invoke (1 samples, 1.75%)</title><rect x="548.2" y="787.0" width="20.7" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="551.2" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/reflect/Method.invoke (1 samples, 1.75%)</title><rect x="548.2" y="771.0" width="20.7" height="15" fill="#61f361" rx="2" ry="2"/>
+<text x="551.2" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (1 samples, 1.75%)</title><rect x="548.2" y="755.0" width="20.7" height="15" fill="#44d844" rx="2" ry="2"/>
+<text x="551.2" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/GeneratedMethodAccessor69.invoke (1 samples, 1.75%)</title><rect x="548.2" y="739.0" width="20.7" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="551.2" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectOne (1 samples, 1.75%)</title><rect x="548.2" y="723.0" width="20.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="551.2" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectList (1 samples, 1.75%)</title><rect x="548.2" y="707.0" width="20.7" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="551.2" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectList (1 samples, 1.75%)</title><rect x="548.2" y="691.0" width="20.7" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="551.2" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/CachingExecutor.query (1 samples, 1.75%)</title><rect x="548.2" y="675.0" width="20.7" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="551.2" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/CachingExecutor.query (1 samples, 1.75%)</title><rect x="548.2" y="659.0" width="20.7" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="551.2" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/BaseExecutor.query (1 samples, 1.75%)</title><rect x="548.2" y="643.0" width="20.7" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="551.2" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/BaseExecutor.queryFromDatabase (1 samples, 1.75%)</title><rect x="548.2" y="627.0" width="20.7" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="551.2" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/SimpleExecutor.doQuery (1 samples, 1.75%)</title><rect x="548.2" y="611.0" width="20.7" height="15" fill="#38cd38" rx="2" ry="2"/>
+<text x="551.2" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy208.query (1 samples, 1.75%)</title><rect x="548.2" y="595.0" width="20.7" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="551.2" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/plugin/Plugin.invoke (1 samples, 1.75%)</title><rect x="548.2" y="579.0" width="20.7" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="551.2" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/reflect/Method.invoke (1 samples, 1.75%)</title><rect x="548.2" y="563.0" width="20.7" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="551.2" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (1 samples, 1.75%)</title><rect x="548.2" y="547.0" width="20.7" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="551.2" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/GeneratedMethodAccessor46.invoke (1 samples, 1.75%)</title><rect x="548.2" y="531.0" width="20.7" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="551.2" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/statement/RoutingStatementHandler.query (1 samples, 1.75%)</title><rect x="548.2" y="515.0" width="20.7" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="551.2" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/statement/PreparedStatementHandler.query (1 samples, 1.75%)</title><rect x="548.2" y="499.0" width="20.7" height="15" fill="#48dd48" rx="2" ry="2"/>
+<text x="551.2" y="510.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy207.handleResultSets (1 samples, 1.75%)</title><rect x="548.2" y="483.0" width="20.7" height="15" fill="#5ef15e" rx="2" ry="2"/>
+<text x="551.2" y="494.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/plugin/Plugin.invoke (1 samples, 1.75%)</title><rect x="548.2" y="467.0" width="20.7" height="15" fill="#48dc48" rx="2" ry="2"/>
+<text x="551.2" y="478.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/common/dao/interceptor/PaginationInterceptor.intercept (1 samples, 1.75%)</title><rect x="548.2" y="451.0" width="20.7" height="15" fill="#43d843" rx="2" ry="2"/>
+<text x="551.2" y="462.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/plugin/Invocation.proceed (1 samples, 1.75%)</title><rect x="548.2" y="435.0" width="20.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="551.2" y="446.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/reflect/Method.invoke (1 samples, 1.75%)</title><rect x="548.2" y="419.0" width="20.7" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="551.2" y="430.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (1 samples, 1.75%)</title><rect x="548.2" y="403.0" width="20.7" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="551.2" y="414.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/GeneratedMethodAccessor47.invoke (1 samples, 1.75%)</title><rect x="548.2" y="387.0" width="20.7" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="551.2" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/resultset/DefaultResultSetHandler.handleResultSets (1 samples, 1.75%)</title><rect x="548.2" y="371.0" width="20.7" height="15" fill="#5df05d" rx="2" ry="2"/>
+<text x="551.2" y="382.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/resultset/DefaultResultSetHandler.getNextResultSet (1 samples, 1.75%)</title><rect x="548.2" y="355.0" width="20.7" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="551.2" y="366.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingStatement.getMoreResults (1 samples, 1.75%)</title><rect x="548.2" y="339.0" width="20.7" height="15" fill="#61f361" rx="2" ry="2"/>
+<text x="551.2" y="350.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingStatement.getMoreResults (1 samples, 1.75%)</title><rect x="548.2" y="323.0" width="20.7" height="15" fill="#3bd13b" rx="2" ry="2"/>
+<text x="551.2" y="334.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/StatementImpl.getMoreResults (1 samples, 1.75%)</title><rect x="548.2" y="307.0" width="20.7" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="551.2" y="318.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/StatementImpl.getMoreResults (1 samples, 1.75%)</title><rect x="548.2" y="291.0" width="20.7" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="551.2" y="302.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ResultSetImpl.close (1 samples, 1.75%)</title><rect x="548.2" y="275.0" width="20.7" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="551.2" y="286.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ResultSetImpl.realClose (1 samples, 1.75%)</title><rect x="548.2" y="259.0" width="20.7" height="15" fill="#35ca35" rx="2" ry="2"/>
+<text x="551.2" y="270.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ResultSetImpl.checkClosed (1 samples, 1.75%)</title><rect x="548.2" y="243.0" width="20.7" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="551.2" y="254.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 1.75%)</title><rect x="548.2" y="227.0" width="20.7" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="551.2" y="238.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 1.75%)</title><rect x="548.2" y="211.0" width="20.7" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="551.2" y="222.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 1.75%)</title><rect x="548.2" y="195.0" width="20.7" height="15" fill="#61f361" rx="2" ry="2"/>
+<text x="551.2" y="206.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 1.75%)</title><rect x="548.2" y="179.0" width="20.7" height="15" fill="#5df05d" rx="2" ry="2"/>
+<text x="551.2" y="190.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/sql/SQLException.&lt;init&gt; (1 samples, 1.75%)</title><rect x="548.2" y="163.0" width="20.7" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="551.2" y="174.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Exception.&lt;init&gt; (1 samples, 1.75%)</title><rect x="548.2" y="147.0" width="20.7" height="15" fill="#6cfd6c" rx="2" ry="2"/>
+<text x="551.2" y="158.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Throwable.&lt;init&gt; (1 samples, 1.75%)</title><rect x="548.2" y="131.0" width="20.7" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="551.2" y="142.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Throwable.fillInStackTrace (1 samples, 1.75%)</title><rect x="548.2" y="115.0" width="20.7" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="551.2" y="126.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Throwable.fillInStackTrace (1 samples, 1.75%)</title><rect x="548.2" y="99.0" width="20.7" height="15" fill="#37cd37" rx="2" ry="2"/>
+<text x="551.2" y="110.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Java_java_lang_Throwable_fillInStackTrace (1 samples, 1.75%)</title><rect x="548.2" y="83.0" width="20.7" height="15" fill="#cf3c3c" rx="2" ry="2"/>
+<text x="551.2" y="94.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>JVM_FillInStackTrace (1 samples, 1.75%)</title><rect x="548.2" y="67.0" width="20.7" height="15" fill="#e45b5b" rx="2" ry="2"/>
+<text x="551.2" y="78.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java_lang_Throwable::fill_in_stack_trace(Handle, methodHandle) (1 samples, 1.75%)</title><rect x="548.2" y="51.0" width="20.7" height="15" fill="#b3b333" rx="2" ry="2"/>
+<text x="551.2" y="62.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java_lang_Throwable::fill_in_stack_trace(Handle, methodHandle, Thread*) (1 samples, 1.75%)</title><rect x="548.2" y="35.0" width="20.7" height="15" fill="#b2b233" rx="2" ry="2"/>
+<text x="551.2" y="46.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ThreadPoolExecutor$Worker.run (9 samples, 15.79%)</title><rect x="568.9" y="1107.0" width="186.4" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="571.9" y="1118.0">java/util/concurrent/Thr..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ThreadPoolExecutor.runWorker (9 samples, 15.79%)</title><rect x="568.9" y="1091.0" width="186.4" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="571.9" y="1102.0">java/util/concurrent/Thr..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ScheduledThreadPoolExecutor$ScheduledFutureTask.run (1 samples, 1.75%)</title><rect x="568.9" y="1075.0" width="20.7" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="571.9" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ScheduledThreadPoolExecutor.reExecutePeriodic (1 samples, 1.75%)</title><rect x="568.9" y="1059.0" width="20.7" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="571.9" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ThreadPoolExecutor.getTask (8 samples, 14.04%)</title><rect x="589.6" y="1075.0" width="165.7" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="592.6" y="1086.0">java/util/concurrent/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ScheduledThreadPoolExecutor$DelayedWorkQueue.take (8 samples, 14.04%)</title><rect x="589.6" y="1059.0" width="165.7" height="15" fill="#35ca35" rx="2" ry="2"/>
+<text x="592.6" y="1070.0">java/util/concurrent/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/ScheduledThreadPoolExecutor$DelayedWorkQueue.take (8 samples, 14.04%)</title><rect x="589.6" y="1043.0" width="165.7" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="592.6" y="1054.0">java/util/concurrent/..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer$ConditionObject.await (6 samples, 10.53%)</title><rect x="589.6" y="1027.0" width="124.3" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="592.6" y="1038.0">java/util/concu..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer.fullyRelease (3 samples, 5.26%)</title><rect x="589.6" y="1011.0" width="62.2" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="592.6" y="1022.0">java/u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer.release (3 samples, 5.26%)</title><rect x="589.6" y="995.0" width="62.2" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="592.6" y="1006.0">java/u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer.unparkSuccessor (3 samples, 5.26%)</title><rect x="589.6" y="979.0" width="62.2" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="592.6" y="990.0">java/u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/LockSupport.unpark (3 samples, 5.26%)</title><rect x="589.6" y="963.0" width="62.2" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="592.6" y="974.0">java/u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.unpark (3 samples, 5.26%)</title><rect x="589.6" y="947.0" width="62.2" height="15" fill="#35ca35" rx="2" ry="2"/>
+<text x="592.6" y="958.0">sun/mi..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Unsafe_Unpark (3 samples, 5.26%)</title><rect x="589.6" y="931.0" width="62.2" height="15" fill="#f77777" rx="2" ry="2"/>
+<text x="592.6" y="942.0">Unsafe..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (3 samples, 5.26%)</title><rect x="589.6" y="915.0" width="62.2" height="15" fill="#cb3737" rx="2" ry="2"/>
+<text x="592.6" y="926.0">/lib/x..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (3 samples, 5.26%)</title><rect x="589.6" y="899.0" width="62.2" height="15" fill="#be5a00" rx="2" ry="2"/>
+<text x="592.6" y="910.0">entry_..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (3 samples, 5.26%)</title><rect x="589.6" y="883.0" width="62.2" height="15" fill="#f99500" rx="2" ry="2"/>
+<text x="592.6" y="894.0">do_sys..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>schedule (3 samples, 5.26%)</title><rect x="589.6" y="867.0" width="62.2" height="15" fill="#e48000" rx="2" ry="2"/>
+<text x="592.6" y="878.0">schedule</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (3 samples, 5.26%)</title><rect x="589.6" y="851.0" width="62.2" height="15" fill="#c96500" rx="2" ry="2"/>
+<text x="592.6" y="862.0">sys_fu..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_futex (3 samples, 5.26%)</title><rect x="589.6" y="835.0" width="62.2" height="15" fill="#c86400" rx="2" ry="2"/>
+<text x="592.6" y="846.0">do_futex</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>wake_up_q (3 samples, 5.26%)</title><rect x="589.6" y="819.0" width="62.2" height="15" fill="#d77300" rx="2" ry="2"/>
+<text x="592.6" y="830.0">wake_u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wake (3 samples, 5.26%)</title><rect x="589.6" y="803.0" width="62.2" height="15" fill="#f99500" rx="2" ry="2"/>
+<text x="592.6" y="814.0">futex_..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>try_to_wake_up (3 samples, 5.26%)</title><rect x="589.6" y="787.0" width="62.2" height="15" fill="#f38f00" rx="2" ry="2"/>
+<text x="592.6" y="798.0">try_to..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_raw_spin_unlock_irqrestore (3 samples, 5.26%)</title><rect x="589.6" y="771.0" width="62.2" height="15" fill="#d57100" rx="2" ry="2"/>
+<text x="592.6" y="782.0">_raw_s..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/LockSupport.park (3 samples, 5.26%)</title><rect x="651.8" y="1011.0" width="62.1" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="654.8" y="1022.0">java/u..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.park (3 samples, 5.26%)</title><rect x="651.8" y="995.0" width="62.1" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="654.8" y="1006.0">sun/mi..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Unsafe_Park (3 samples, 5.26%)</title><rect x="651.8" y="979.0" width="62.1" height="15" fill="#e05656" rx="2" ry="2"/>
+<text x="654.8" y="990.0">Unsafe..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.75%)</title><rect x="651.8" y="963.0" width="20.7" height="15" fill="#ed6868" rx="2" ry="2"/>
+<text x="654.8" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ThreadStateTransition::trans_from_native(JavaThreadState) (1 samples, 1.75%)</title><rect x="672.5" y="963.0" width="20.7" height="15" fill="#b4b433" rx="2" ry="2"/>
+<text x="675.5" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_init (1 samples, 1.75%)</title><rect x="693.2" y="963.0" width="20.7" height="15" fill="#e55c5c" rx="2" ry="2"/>
+<text x="696.2" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer$ConditionObject.awaitNanos (1 samples, 1.75%)</title><rect x="713.9" y="1027.0" width="20.7" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="716.9" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/LockSupport.parkNanos (1 samples, 1.75%)</title><rect x="713.9" y="1011.0" width="20.7" height="15" fill="#44d844" rx="2" ry="2"/>
+<text x="716.9" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.park (1 samples, 1.75%)</title><rect x="713.9" y="995.0" width="20.7" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="716.9" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Unsafe_Park (1 samples, 1.75%)</title><rect x="713.9" y="979.0" width="20.7" height="15" fill="#e76060" rx="2" ry="2"/>
+<text x="716.9" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.75%)</title><rect x="713.9" y="963.0" width="20.7" height="15" fill="#f87878" rx="2" ry="2"/>
+<text x="716.9" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 1.75%)</title><rect x="713.9" y="947.0" width="20.7" height="15" fill="#ee8a00" rx="2" ry="2"/>
+<text x="716.9" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (1 samples, 1.75%)</title><rect x="713.9" y="931.0" width="20.7" height="15" fill="#e68200" rx="2" ry="2"/>
+<text x="716.9" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (1 samples, 1.75%)</title><rect x="713.9" y="915.0" width="20.7" height="15" fill="#c05c00" rx="2" ry="2"/>
+<text x="716.9" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_futex (1 samples, 1.75%)</title><rect x="713.9" y="899.0" width="20.7" height="15" fill="#ee8a00" rx="2" ry="2"/>
+<text x="716.9" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hrtimer_wakeup (1 samples, 1.75%)</title><rect x="713.9" y="883.0" width="20.7" height="15" fill="#f49000" rx="2" ry="2"/>
+<text x="716.9" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wait (1 samples, 1.75%)</title><rect x="713.9" y="867.0" width="20.7" height="15" fill="#fa9600" rx="2" ry="2"/>
+<text x="716.9" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_raw_spin_lock (1 samples, 1.75%)</title><rect x="713.9" y="851.0" width="20.7" height="15" fill="#f69200" rx="2" ry="2"/>
+<text x="716.9" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/ReentrantLock.unlock (1 samples, 1.75%)</title><rect x="734.6" y="1027.0" width="20.7" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="737.6" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer.release (1 samples, 1.75%)</title><rect x="734.6" y="1011.0" width="20.7" height="15" fill="#6cfd6c" rx="2" ry="2"/>
+<text x="737.6" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer.unparkSuccessor (1 samples, 1.75%)</title><rect x="734.6" y="995.0" width="20.7" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="737.6" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/concurrent/locks/LockSupport.unpark (1 samples, 1.75%)</title><rect x="734.6" y="979.0" width="20.7" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="737.6" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/misc/Unsafe.unpark (1 samples, 1.75%)</title><rect x="734.6" y="963.0" width="20.7" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="737.6" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Unsafe_Unpark (1 samples, 1.75%)</title><rect x="734.6" y="947.0" width="20.7" height="15" fill="#ec6767" rx="2" ry="2"/>
+<text x="737.6" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.75%)</title><rect x="734.6" y="931.0" width="20.7" height="15" fill="#e35959" rx="2" ry="2"/>
+<text x="737.6" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 1.75%)</title><rect x="734.6" y="915.0" width="20.7" height="15" fill="#c86400" rx="2" ry="2"/>
+<text x="737.6" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (1 samples, 1.75%)</title><rect x="734.6" y="899.0" width="20.7" height="15" fill="#f38f00" rx="2" ry="2"/>
+<text x="737.6" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (1 samples, 1.75%)</title><rect x="734.6" y="883.0" width="20.7" height="15" fill="#f79300" rx="2" ry="2"/>
+<text x="737.6" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_futex (1 samples, 1.75%)</title><rect x="734.6" y="867.0" width="20.7" height="15" fill="#c35f00" rx="2" ry="2"/>
+<text x="737.6" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>wake_up_q (1 samples, 1.75%)</title><rect x="734.6" y="851.0" width="20.7" height="15" fill="#e88400" rx="2" ry="2"/>
+<text x="737.6" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wake (1 samples, 1.75%)</title><rect x="734.6" y="835.0" width="20.7" height="15" fill="#ce6a00" rx="2" ry="2"/>
+<text x="737.6" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>try_to_wake_up (1 samples, 1.75%)</title><rect x="734.6" y="819.0" width="20.7" height="15" fill="#e68200" rx="2" ry="2"/>
+<text x="737.6" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_raw_spin_unlock_irqrestore (1 samples, 1.75%)</title><rect x="734.6" y="803.0" width="20.7" height="15" fill="#cc6800" rx="2" ry="2"/>
+<text x="737.6" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>net/rubyeye/xmemcached/impl/MemcachedConnector$SessionMonitor.run (1 samples, 1.75%)</title><rect x="755.3" y="1123.0" width="20.7" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="758.3" y="1134.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>net/rubyeye/xmemcached/impl/MemcachedConnector.connect (1 samples, 1.75%)</title><rect x="755.3" y="1107.0" width="20.7" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="758.3" y="1118.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/google/code/yanf4j/nio/impl/SocketChannelController.configureSocketChannel (1 samples, 1.75%)</title><rect x="755.3" y="1091.0" width="20.7" height="15" fill="#45da45" rx="2" ry="2"/>
+<text x="758.3" y="1102.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SocketAdaptor.setTcpNoDelay (1 samples, 1.75%)</title><rect x="755.3" y="1075.0" width="20.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="758.3" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SocketAdaptor.setBooleanOption (1 samples, 1.75%)</title><rect x="755.3" y="1059.0" width="20.7" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="758.3" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/SocketChannelImpl.setOption (1 samples, 1.75%)</title><rect x="755.3" y="1043.0" width="20.7" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="758.3" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/ch/Net.setSocketOption (1 samples, 1.75%)</title><rect x="755.3" y="1027.0" width="20.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="758.3" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/core/QuartzSchedulerThread.run (9 samples, 15.79%)</title><rect x="776.0" y="1123.0" width="186.3" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="779.0" y="1134.0">org/quartz/core/QuartzSc..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Object.wait (1 samples, 1.75%)</title><rect x="776.0" y="1107.0" width="20.7" height="15" fill="#50e450" rx="2" ry="2"/>
+<text x="779.0" y="1118.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>JVM_MonitorWait (1 samples, 1.75%)</title><rect x="776.0" y="1091.0" width="20.7" height="15" fill="#fd7f7f" rx="2" ry="2"/>
+<text x="779.0" y="1102.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ObjectMonitor::wait(long, bool, Thread*) (1 samples, 1.75%)</title><rect x="776.0" y="1075.0" width="20.7" height="15" fill="#bebe37" rx="2" ry="2"/>
+<text x="779.0" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Monitor::lock_without_safepoint_check() (1 samples, 1.75%)</title><rect x="776.0" y="1059.0" width="20.7" height="15" fill="#cdcd3c" rx="2" ry="2"/>
+<text x="779.0" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.acquireNextTriggers (5 samples, 8.77%)</title><rect x="796.7" y="1107.0" width="103.5" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="799.7" y="1118.0">org/quartz/i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.executeInNonManagedTXLock (5 samples, 8.77%)</title><rect x="796.7" y="1091.0" width="103.5" height="15" fill="#38ce38" rx="2" ry="2"/>
+<text x="799.7" y="1102.0">org/quartz/i..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreCMT.getNonManagedTXConnection (1 samples, 1.75%)</title><rect x="796.7" y="1075.0" width="20.7" height="15" fill="#4ee14e" rx="2" ry="2"/>
+<text x="799.7" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/utils/DBConnectionManager.getConnection (1 samples, 1.75%)</title><rect x="796.7" y="1059.0" width="20.7" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="799.7" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/scheduling/quartz/LocalDataSourceJobStore$2.getConnection (1 samples, 1.75%)</title><rect x="796.7" y="1043.0" width="20.7" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="799.7" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/BasicDataSource.getConnection (1 samples, 1.75%)</title><rect x="796.7" y="1027.0" width="20.7" height="15" fill="#4de04d" rx="2" ry="2"/>
+<text x="799.7" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolingDataSource.getConnection (1 samples, 1.75%)</title><rect x="796.7" y="1011.0" width="20.7" height="15" fill="#46da46" rx="2" ry="2"/>
+<text x="799.7" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/pool2/impl/GenericObjectPool.borrowObject (1 samples, 1.75%)</title><rect x="796.7" y="995.0" width="20.7" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="799.7" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/pool2/impl/GenericObjectPool.borrowObject (1 samples, 1.75%)</title><rect x="796.7" y="979.0" width="20.7" height="15" fill="#4cdf4c" rx="2" ry="2"/>
+<text x="799.7" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolableConnectionFactory.validateObject (1 samples, 1.75%)</title><rect x="796.7" y="963.0" width="20.7" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="799.7" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolableConnectionFactory.validateConnection (1 samples, 1.75%)</title><rect x="796.7" y="947.0" width="20.7" height="15" fill="#46da46" rx="2" ry="2"/>
+<text x="799.7" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolableConnection.validate (1 samples, 1.75%)</title><rect x="796.7" y="931.0" width="20.7" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="799.7" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.executeQuery (1 samples, 1.75%)</title><rect x="796.7" y="915.0" width="20.7" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="799.7" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (1 samples, 1.75%)</title><rect x="796.7" y="899.0" width="20.7" height="15" fill="#40d440" rx="2" ry="2"/>
+<text x="799.7" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 1.75%)</title><rect x="796.7" y="883.0" width="20.7" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="799.7" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport$40.execute (4 samples, 7.02%)</title><rect x="817.4" y="1075.0" width="82.8" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="820.4" y="1086.0">org/quart..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport$40.execute (4 samples, 7.02%)</title><rect x="817.4" y="1059.0" width="82.8" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="820.4" y="1070.0">org/quart..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.acquireNextTrigger (4 samples, 7.02%)</title><rect x="817.4" y="1043.0" width="82.8" height="15" fill="#44d844" rx="2" ry="2"/>
+<text x="820.4" y="1054.0">org/quart..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.insertFiredTrigger (1 samples, 1.75%)</title><rect x="817.4" y="1027.0" width="20.7" height="15" fill="#5cef5c" rx="2" ry="2"/>
+<text x="820.4" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.setString (1 samples, 1.75%)</title><rect x="817.4" y="1011.0" width="20.7" height="15" fill="#3cd23c" rx="2" ry="2"/>
+<text x="820.4" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.setString (1 samples, 1.75%)</title><rect x="817.4" y="995.0" width="20.7" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="820.4" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.setString (1 samples, 1.75%)</title><rect x="817.4" y="979.0" width="20.7" height="15" fill="#34ca34" rx="2" ry="2"/>
+<text x="820.4" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.setInternal (1 samples, 1.75%)</title><rect x="817.4" y="963.0" width="20.7" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="820.4" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.selectJobDetail (1 samples, 1.75%)</title><rect x="838.1" y="1027.0" width="20.7" height="15" fill="#5bee5b" rx="2" ry="2"/>
+<text x="841.1" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeQuery (1 samples, 1.75%)</title><rect x="838.1" y="1011.0" width="20.7" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="841.1" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeQuery (1 samples, 1.75%)</title><rect x="838.1" y="995.0" width="20.7" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="841.1" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.executeQuery (1 samples, 1.75%)</title><rect x="838.1" y="979.0" width="20.7" height="15" fill="#46db46" rx="2" ry="2"/>
+<text x="841.1" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (1 samples, 1.75%)</title><rect x="838.1" y="963.0" width="20.7" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="841.1" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 1.75%)</title><rect x="838.1" y="947.0" width="20.7" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="841.1" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 1.75%)</title><rect x="838.1" y="931.0" width="20.7" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="841.1" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.sendCommand (1 samples, 1.75%)</title><rect x="838.1" y="915.0" width="20.7" height="15" fill="#5df05d" rx="2" ry="2"/>
+<text x="841.1" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.send (1 samples, 1.75%)</title><rect x="838.1" y="899.0" width="20.7" height="15" fill="#45da45" rx="2" ry="2"/>
+<text x="841.1" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/BufferedOutputStream.flush (1 samples, 1.75%)</title><rect x="838.1" y="883.0" width="20.7" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="841.1" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/io/BufferedOutputStream.flushBuffer (1 samples, 1.75%)</title><rect x="838.1" y="867.0" width="20.7" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="841.1" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketOutputStream.write (1 samples, 1.75%)</title><rect x="838.1" y="851.0" width="20.7" height="15" fill="#69fa69" rx="2" ry="2"/>
+<text x="841.1" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketOutputStream.socketWrite (1 samples, 1.75%)</title><rect x="838.1" y="835.0" width="20.7" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="841.1" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketOutputStream.socketWrite0 (1 samples, 1.75%)</title><rect x="838.1" y="819.0" width="20.7" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="841.1" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.75%)</title><rect x="838.1" y="803.0" width="20.7" height="15" fill="#d64646" rx="2" ry="2"/>
+<text x="841.1" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 1.75%)</title><rect x="838.1" y="787.0" width="20.7" height="15" fill="#e07c00" rx="2" ry="2"/>
+<text x="841.1" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (1 samples, 1.75%)</title><rect x="838.1" y="771.0" width="20.7" height="15" fill="#c35f00" rx="2" ry="2"/>
+<text x="841.1" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_ioctl (1 samples, 1.75%)</title><rect x="838.1" y="755.0" width="20.7" height="15" fill="#ce6a00" rx="2" ry="2"/>
+<text x="841.1" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (1 samples, 1.75%)</title><rect x="838.1" y="739.0" width="20.7" height="15" fill="#f79300" rx="2" ry="2"/>
+<text x="841.1" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_vfs_ioctl (1 samples, 1.75%)</title><rect x="838.1" y="723.0" width="20.7" height="15" fill="#ea8600" rx="2" ry="2"/>
+<text x="841.1" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>SYSC_sendto (1 samples, 1.75%)</title><rect x="838.1" y="707.0" width="20.7" height="15" fill="#c46000" rx="2" ry="2"/>
+<text x="841.1" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sock_sendmsg (1 samples, 1.75%)</title><rect x="838.1" y="691.0" width="20.7" height="15" fill="#c56100" rx="2" ry="2"/>
+<text x="841.1" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_sendmsg (1 samples, 1.75%)</title><rect x="838.1" y="675.0" width="20.7" height="15" fill="#d57100" rx="2" ry="2"/>
+<text x="841.1" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__tcp_push_pending_frames (1 samples, 1.75%)</title><rect x="838.1" y="659.0" width="20.7" height="15" fill="#e37f00" rx="2" ry="2"/>
+<text x="841.1" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_write_xmit (1 samples, 1.75%)</title><rect x="838.1" y="643.0" width="20.7" height="15" fill="#e48000" rx="2" ry="2"/>
+<text x="841.1" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_transmit_skb (1 samples, 1.75%)</title><rect x="838.1" y="627.0" width="20.7" height="15" fill="#e98500" rx="2" ry="2"/>
+<text x="841.1" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ip_finish_output (1 samples, 1.75%)</title><rect x="838.1" y="611.0" width="20.7" height="15" fill="#d06c00" rx="2" ry="2"/>
+<text x="841.1" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ip_output (1 samples, 1.75%)</title><rect x="838.1" y="595.0" width="20.7" height="15" fill="#f08c00" rx="2" ry="2"/>
+<text x="841.1" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ip_finish_output2 (1 samples, 1.75%)</title><rect x="838.1" y="579.0" width="20.7" height="15" fill="#d06c00" rx="2" ry="2"/>
+<text x="841.1" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__dev_queue_xmit (1 samples, 1.75%)</title><rect x="838.1" y="563.0" width="20.7" height="15" fill="#d36f00" rx="2" ry="2"/>
+<text x="841.1" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>dev_hard_start_xmit (1 samples, 1.75%)</title><rect x="838.1" y="547.0" width="20.7" height="15" fill="#ca6600" rx="2" ry="2"/>
+<text x="841.1" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>macvlan_start_xmit	[macvlan] (1 samples, 1.75%)</title><rect x="838.1" y="531.0" width="20.7" height="15" fill="#fd9900" rx="2" ry="2"/>
+<text x="841.1" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__dev_queue_xmit (1 samples, 1.75%)</title><rect x="838.1" y="515.0" width="20.7" height="15" fill="#be5a00" rx="2" ry="2"/>
+<text x="841.1" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>dev_hard_start_xmit (1 samples, 1.75%)</title><rect x="838.1" y="499.0" width="20.7" height="15" fill="#f38f00" rx="2" ry="2"/>
+<text x="841.1" y="510.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>br_dev_xmit	[bridge] (1 samples, 1.75%)</title><rect x="838.1" y="483.0" width="20.7" height="15" fill="#d36f00" rx="2" ry="2"/>
+<text x="841.1" y="494.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>br_forward	[bridge] (1 samples, 1.75%)</title><rect x="838.1" y="467.0" width="20.7" height="15" fill="#ca6600" rx="2" ry="2"/>
+<text x="841.1" y="478.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>br_forward	[bridge] (1 samples, 1.75%)</title><rect x="838.1" y="451.0" width="20.7" height="15" fill="#da7600" rx="2" ry="2"/>
+<text x="841.1" y="462.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__br_forward	[bridge] (1 samples, 1.75%)</title><rect x="838.1" y="435.0" width="20.7" height="15" fill="#fc9800" rx="2" ry="2"/>
+<text x="841.1" y="446.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>br_dev_queue_push_xmit	[bridge] (1 samples, 1.75%)</title><rect x="838.1" y="419.0" width="20.7" height="15" fill="#f99500" rx="2" ry="2"/>
+<text x="841.1" y="430.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>br_forward_finish	[bridge] (1 samples, 1.75%)</title><rect x="838.1" y="403.0" width="20.7" height="15" fill="#ef8b00" rx="2" ry="2"/>
+<text x="841.1" y="414.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>br_dev_queue_push_xmit	[bridge] (1 samples, 1.75%)</title><rect x="838.1" y="387.0" width="20.7" height="15" fill="#eb8700" rx="2" ry="2"/>
+<text x="841.1" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__dev_queue_xmit (1 samples, 1.75%)</title><rect x="838.1" y="371.0" width="20.7" height="15" fill="#c56100" rx="2" ry="2"/>
+<text x="841.1" y="382.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>dev_hard_start_xmit (1 samples, 1.75%)</title><rect x="838.1" y="355.0" width="20.7" height="15" fill="#ea8600" rx="2" ry="2"/>
+<text x="841.1" y="366.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>vlan_dev_hard_start_xmit	[8021q] (1 samples, 1.75%)</title><rect x="838.1" y="339.0" width="20.7" height="15" fill="#d67200" rx="2" ry="2"/>
+<text x="841.1" y="350.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__dev_queue_xmit (1 samples, 1.75%)</title><rect x="838.1" y="323.0" width="20.7" height="15" fill="#f08c00" rx="2" ry="2"/>
+<text x="841.1" y="334.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>dev_hard_start_xmit (1 samples, 1.75%)</title><rect x="838.1" y="307.0" width="20.7" height="15" fill="#fb9700" rx="2" ry="2"/>
+<text x="841.1" y="318.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>bond_start_xmit	[bonding] (1 samples, 1.75%)</title><rect x="838.1" y="291.0" width="20.7" height="15" fill="#f99500" rx="2" ry="2"/>
+<text x="841.1" y="302.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__dev_queue_xmit (1 samples, 1.75%)</title><rect x="838.1" y="275.0" width="20.7" height="15" fill="#f69200" rx="2" ry="2"/>
+<text x="841.1" y="286.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sch_direct_xmit (1 samples, 1.75%)</title><rect x="838.1" y="259.0" width="20.7" height="15" fill="#cb6700" rx="2" ry="2"/>
+<text x="841.1" y="270.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>dev_hard_start_xmit (1 samples, 1.75%)</title><rect x="838.1" y="243.0" width="20.7" height="15" fill="#f18d00" rx="2" ry="2"/>
+<text x="841.1" y="254.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ixgbe_xmit_frame_ring	[ixgbe] (1 samples, 1.75%)</title><rect x="838.1" y="227.0" width="20.7" height="15" fill="#e17d00" rx="2" ry="2"/>
+<text x="841.1" y="238.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.selectTriggerToAcquire (2 samples, 3.51%)</title><rect x="858.8" y="1027.0" width="41.4" height="15" fill="#43d843" rx="2" ry="2"/>
+<text x="861.8" y="1038.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeQuery (1 samples, 1.75%)</title><rect x="858.8" y="1011.0" width="20.7" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="861.8" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeQuery (1 samples, 1.75%)</title><rect x="858.8" y="995.0" width="20.7" height="15" fill="#68fa68" rx="2" ry="2"/>
+<text x="861.8" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.executeQuery (1 samples, 1.75%)</title><rect x="858.8" y="979.0" width="20.7" height="15" fill="#66f866" rx="2" ry="2"/>
+<text x="861.8" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/StatementImpl.executeSimpleNonQuery (1 samples, 1.75%)</title><rect x="858.8" y="963.0" width="20.7" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="861.8" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 1.75%)</title><rect x="858.8" y="947.0" width="20.7" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="861.8" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 1.75%)</title><rect x="858.8" y="931.0" width="20.7" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="861.8" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.getServerCharacterEncoding (1 samples, 1.75%)</title><rect x="858.8" y="915.0" width="20.7" height="15" fill="#42d742" rx="2" ry="2"/>
+<text x="861.8" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.closeStatement (1 samples, 1.75%)</title><rect x="879.5" y="1011.0" width="20.7" height="15" fill="#65f765" rx="2" ry="2"/>
+<text x="882.5" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingStatement.close (1 samples, 1.75%)</title><rect x="879.5" y="995.0" width="20.7" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="882.5" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingStatement.close (1 samples, 1.75%)</title><rect x="879.5" y="979.0" width="20.7" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="882.5" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/StatementImpl.close (1 samples, 1.75%)</title><rect x="879.5" y="963.0" width="20.7" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="882.5" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.realClose (1 samples, 1.75%)</title><rect x="879.5" y="947.0" width="20.7" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="882.5" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/StatementImpl.realClose (1 samples, 1.75%)</title><rect x="879.5" y="931.0" width="20.7" height="15" fill="#43d843" rx="2" ry="2"/>
+<text x="882.5" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.unsetMaxRows (1 samples, 1.75%)</title><rect x="879.5" y="915.0" width="20.7" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="882.5" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 1.75%)</title><rect x="879.5" y="899.0" width="20.7" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="882.5" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 1.75%)</title><rect x="879.5" y="883.0" width="20.7" height="15" fill="#5df05d" rx="2" ry="2"/>
+<text x="882.5" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.sendCommand (1 samples, 1.75%)</title><rect x="879.5" y="867.0" width="20.7" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="882.5" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.checkErrorPacket (1 samples, 1.75%)</title><rect x="879.5" y="851.0" width="20.7" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="882.5" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 1.75%)</title><rect x="879.5" y="835.0" width="20.7" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="882.5" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 1.75%)</title><rect x="879.5" y="819.0" width="20.7" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="882.5" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.readFully (1 samples, 1.75%)</title><rect x="879.5" y="803.0" width="20.7" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="882.5" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/util/ReadAheadInputStream.read (1 samples, 1.75%)</title><rect x="879.5" y="787.0" width="20.7" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="882.5" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/util/ReadAheadInputStream.readFromUnderlyingStreamIfNecessary (1 samples, 1.75%)</title><rect x="879.5" y="771.0" width="20.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="882.5" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/util/ReadAheadInputStream.fill (1 samples, 1.75%)</title><rect x="879.5" y="755.0" width="20.7" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="882.5" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.read (1 samples, 1.75%)</title><rect x="879.5" y="739.0" width="20.7" height="15" fill="#39ce39" rx="2" ry="2"/>
+<text x="882.5" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.read (1 samples, 1.75%)</title><rect x="879.5" y="723.0" width="20.7" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="882.5" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.socketRead (1 samples, 1.75%)</title><rect x="879.5" y="707.0" width="20.7" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="882.5" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.socketRead0 (1 samples, 1.75%)</title><rect x="879.5" y="691.0" width="20.7" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="882.5" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.75%)</title><rect x="879.5" y="675.0" width="20.7" height="15" fill="#fb7c7c" rx="2" ry="2"/>
+<text x="882.5" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.triggersFired (3 samples, 5.26%)</title><rect x="900.2" y="1107.0" width="62.1" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="903.2" y="1118.0">org/qu..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.executeInNonManagedTXLock (3 samples, 5.26%)</title><rect x="900.2" y="1091.0" width="62.1" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="903.2" y="1102.0">org/qu..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreCMT.getNonManagedTXConnection (2 samples, 3.51%)</title><rect x="900.2" y="1075.0" width="41.4" height="15" fill="#64f664" rx="2" ry="2"/>
+<text x="903.2" y="1086.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/utils/DBConnectionManager.getConnection (2 samples, 3.51%)</title><rect x="900.2" y="1059.0" width="41.4" height="15" fill="#63f463" rx="2" ry="2"/>
+<text x="903.2" y="1070.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/scheduling/quartz/LocalDataSourceJobStore$2.getConnection (2 samples, 3.51%)</title><rect x="900.2" y="1043.0" width="41.4" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="903.2" y="1054.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/BasicDataSource.getConnection (2 samples, 3.51%)</title><rect x="900.2" y="1027.0" width="41.4" height="15" fill="#46da46" rx="2" ry="2"/>
+<text x="903.2" y="1038.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolingDataSource.getConnection (2 samples, 3.51%)</title><rect x="900.2" y="1011.0" width="41.4" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="903.2" y="1022.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/pool2/impl/GenericObjectPool.borrowObject (2 samples, 3.51%)</title><rect x="900.2" y="995.0" width="41.4" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="903.2" y="1006.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/pool2/impl/GenericObjectPool.borrowObject (2 samples, 3.51%)</title><rect x="900.2" y="979.0" width="41.4" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="903.2" y="990.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolableConnectionFactory.validateObject (2 samples, 3.51%)</title><rect x="900.2" y="963.0" width="41.4" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="903.2" y="974.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolableConnectionFactory.validateConnection (2 samples, 3.51%)</title><rect x="900.2" y="947.0" width="41.4" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="903.2" y="958.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolableConnection.validate (2 samples, 3.51%)</title><rect x="900.2" y="931.0" width="41.4" height="15" fill="#36cb36" rx="2" ry="2"/>
+<text x="903.2" y="942.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.executeQuery (2 samples, 3.51%)</title><rect x="900.2" y="915.0" width="41.4" height="15" fill="#38cd38" rx="2" ry="2"/>
+<text x="903.2" y="926.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ResultSetImpl.realClose (2 samples, 3.51%)</title><rect x="900.2" y="899.0" width="41.4" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="903.2" y="910.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ResultSetImpl.checkClosed (2 samples, 3.51%)</title><rect x="900.2" y="883.0" width="41.4" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="903.2" y="894.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/SQLError.createSQLException (2 samples, 3.51%)</title><rect x="900.2" y="867.0" width="41.4" height="15" fill="#43d743" rx="2" ry="2"/>
+<text x="903.2" y="878.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/SQLError.createSQLException (2 samples, 3.51%)</title><rect x="900.2" y="851.0" width="41.4" height="15" fill="#45da45" rx="2" ry="2"/>
+<text x="903.2" y="862.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/SQLError.createSQLException (2 samples, 3.51%)</title><rect x="900.2" y="835.0" width="41.4" height="15" fill="#37cd37" rx="2" ry="2"/>
+<text x="903.2" y="846.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/SQLError.createSQLException (2 samples, 3.51%)</title><rect x="900.2" y="819.0" width="41.4" height="15" fill="#4bdf4b" rx="2" ry="2"/>
+<text x="903.2" y="830.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/sql/SQLException.&lt;init&gt; (2 samples, 3.51%)</title><rect x="900.2" y="803.0" width="41.4" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="903.2" y="814.0">jav..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Exception.&lt;init&gt; (2 samples, 3.51%)</title><rect x="900.2" y="787.0" width="41.4" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="903.2" y="798.0">jav..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Throwable.&lt;init&gt; (2 samples, 3.51%)</title><rect x="900.2" y="771.0" width="41.4" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="903.2" y="782.0">jav..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Throwable.fillInStackTrace (2 samples, 3.51%)</title><rect x="900.2" y="755.0" width="41.4" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="903.2" y="766.0">jav..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Throwable.fillInStackTrace (2 samples, 3.51%)</title><rect x="900.2" y="739.0" width="41.4" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="903.2" y="750.0">jav..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Java_java_lang_Throwable_fillInStackTrace (2 samples, 3.51%)</title><rect x="900.2" y="723.0" width="41.4" height="15" fill="#e25858" rx="2" ry="2"/>
+<text x="903.2" y="734.0">Jav..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>JVM_FillInStackTrace (2 samples, 3.51%)</title><rect x="900.2" y="707.0" width="41.4" height="15" fill="#d03e3e" rx="2" ry="2"/>
+<text x="903.2" y="718.0">JVM..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java_lang_Throwable::fill_in_stack_trace(Handle, methodHandle) (2 samples, 3.51%)</title><rect x="900.2" y="691.0" width="41.4" height="15" fill="#dfdf43" rx="2" ry="2"/>
+<text x="903.2" y="702.0">jav..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java_lang_Throwable::fill_in_stack_trace(Handle, methodHandle, Thread*) (2 samples, 3.51%)</title><rect x="900.2" y="675.0" width="41.4" height="15" fill="#d1d13e" rx="2" ry="2"/>
+<text x="903.2" y="686.0">jav..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>BacktraceBuilder::expand(Thread*) (1 samples, 1.75%)</title><rect x="900.2" y="659.0" width="20.7" height="15" fill="#cbcb3c" rx="2" ry="2"/>
+<text x="903.2" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>TypeArrayKlass::allocate_common(int, bool, Thread*) (1 samples, 1.75%)</title><rect x="900.2" y="643.0" width="20.7" height="15" fill="#baba36" rx="2" ry="2"/>
+<text x="903.2" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>frame::sender(RegisterMap*) const (1 samples, 1.75%)</title><rect x="920.9" y="659.0" width="20.7" height="15" fill="#cdcd3d" rx="2" ry="2"/>
+<text x="923.9" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>frame::sender_for_compiled_frame(RegisterMap*) const (1 samples, 1.75%)</title><rect x="920.9" y="643.0" width="20.7" height="15" fill="#c6c63a" rx="2" ry="2"/>
+<text x="923.9" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CodeCache::find_blob(void*) (1 samples, 1.75%)</title><rect x="920.9" y="627.0" width="20.7" height="15" fill="#dcdc42" rx="2" ry="2"/>
+<text x="923.9" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>CodeHeap::find_start(void*) const (1 samples, 1.75%)</title><rect x="920.9" y="611.0" width="20.7" height="15" fill="#c4c439" rx="2" ry="2"/>
+<text x="923.9" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport$43.execute (1 samples, 1.75%)</title><rect x="941.6" y="1075.0" width="20.7" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="944.6" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport$43.execute (1 samples, 1.75%)</title><rect x="941.6" y="1059.0" width="20.7" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="944.6" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.triggerFired (1 samples, 1.75%)</title><rect x="941.6" y="1043.0" width="20.7" height="15" fill="#5df05d" rx="2" ry="2"/>
+<text x="944.6" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.retrieveJob (1 samples, 1.75%)</title><rect x="941.6" y="1027.0" width="20.7" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="944.6" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.selectJobDetail (1 samples, 1.75%)</title><rect x="941.6" y="1011.0" width="20.7" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="944.6" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingResultSet.getString (1 samples, 1.75%)</title><rect x="941.6" y="995.0" width="20.7" height="15" fill="#46da46" rx="2" ry="2"/>
+<text x="944.6" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingResultSet.getString (1 samples, 1.75%)</title><rect x="941.6" y="979.0" width="20.7" height="15" fill="#67f967" rx="2" ry="2"/>
+<text x="944.6" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ResultSetImpl.getString (1 samples, 1.75%)</title><rect x="941.6" y="963.0" width="20.7" height="15" fill="#3acf3a" rx="2" ry="2"/>
+<text x="944.6" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ResultSetImpl.findColumn (1 samples, 1.75%)</title><rect x="941.6" y="947.0" width="20.7" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="944.6" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ResultSetImpl.buildIndexMapping (1 samples, 1.75%)</title><rect x="941.6" y="931.0" width="20.7" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="944.6" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/Field.getOriginalName (1 samples, 1.75%)</title><rect x="941.6" y="915.0" width="20.7" height="15" fill="#60f360" rx="2" ry="2"/>
+<text x="944.6" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/Field.getStringFromBytes (1 samples, 1.75%)</title><rect x="941.6" y="899.0" width="20.7" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="944.6" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/StringUtils.toString (1 samples, 1.75%)</title><rect x="941.6" y="883.0" width="20.7" height="15" fill="#43d843" rx="2" ry="2"/>
+<text x="944.6" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/nio/charset/Charset.decode (1 samples, 1.75%)</title><rect x="941.6" y="867.0" width="20.7" height="15" fill="#38ce38" rx="2" ry="2"/>
+<text x="944.6" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/nio/charset/CharsetDecoder.decode (1 samples, 1.75%)</title><rect x="941.6" y="851.0" width="20.7" height="15" fill="#65f765" rx="2" ry="2"/>
+<text x="944.6" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/nio/charset/CharsetDecoder.decode (1 samples, 1.75%)</title><rect x="941.6" y="835.0" width="20.7" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="944.6" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/nio/cs/UTF_8$Decoder.decodeLoop (1 samples, 1.75%)</title><rect x="941.6" y="819.0" width="20.7" height="15" fill="#34ca34" rx="2" ry="2"/>
+<text x="944.6" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/simpl/SimpleThreadPool$WorkerThread.run (11 samples, 19.30%)</title><rect x="962.3" y="1123.0" width="227.7" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="965.3" y="1134.0">org/quartz/simpl/SimpleThreadP..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/Object.wait (2 samples, 3.51%)</title><rect x="962.3" y="1107.0" width="41.4" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="965.3" y="1118.0">jav..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>JVM_MonitorWait (2 samples, 3.51%)</title><rect x="962.3" y="1091.0" width="41.4" height="15" fill="#ee6a6a" rx="2" ry="2"/>
+<text x="965.3" y="1102.0">JVM..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ObjectMonitor::wait(long, bool, Thread*) (2 samples, 3.51%)</title><rect x="962.3" y="1075.0" width="41.4" height="15" fill="#baba36" rx="2" ry="2"/>
+<text x="965.3" y="1086.0">Obj..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (2 samples, 3.51%)</title><rect x="962.3" y="1059.0" width="41.4" height="15" fill="#e25757" rx="2" ry="2"/>
+<text x="965.3" y="1070.0">/li..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (2 samples, 3.51%)</title><rect x="962.3" y="1043.0" width="41.4" height="15" fill="#f69200" rx="2" ry="2"/>
+<text x="965.3" y="1054.0">ent..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (2 samples, 3.51%)</title><rect x="962.3" y="1027.0" width="41.4" height="15" fill="#c46000" rx="2" ry="2"/>
+<text x="965.3" y="1038.0">do_..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (2 samples, 3.51%)</title><rect x="962.3" y="1011.0" width="41.4" height="15" fill="#c46000" rx="2" ry="2"/>
+<text x="965.3" y="1022.0">sys..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_futex (1 samples, 1.75%)</title><rect x="962.3" y="995.0" width="20.7" height="15" fill="#d67200" rx="2" ry="2"/>
+<text x="965.3" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hrtimer_wakeup (1 samples, 1.75%)</title><rect x="962.3" y="979.0" width="20.7" height="15" fill="#d16d00" rx="2" ry="2"/>
+<text x="965.3" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wait (1 samples, 1.75%)</title><rect x="962.3" y="963.0" width="20.7" height="15" fill="#e88400" rx="2" ry="2"/>
+<text x="965.3" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wait_queue_me (1 samples, 1.75%)</title><rect x="962.3" y="947.0" width="20.7" height="15" fill="#f28e00" rx="2" ry="2"/>
+<text x="965.3" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hrtimer_start_range_ns (1 samples, 1.75%)</title><rect x="962.3" y="931.0" width="20.7" height="15" fill="#c66200" rx="2" ry="2"/>
+<text x="965.3" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>_raw_spin_unlock_irqrestore (1 samples, 1.75%)</title><rect x="962.3" y="915.0" width="20.7" height="15" fill="#c15d00" rx="2" ry="2"/>
+<text x="965.3" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_vfs_ioctl (1 samples, 1.75%)</title><rect x="983.0" y="995.0" width="20.7" height="15" fill="#c15d00" rx="2" ry="2"/>
+<text x="986.0" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sock_ioctl (1 samples, 1.75%)</title><rect x="983.0" y="979.0" width="20.7" height="15" fill="#db7700" rx="2" ry="2"/>
+<text x="986.0" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sock_do_ioctl (1 samples, 1.75%)</title><rect x="983.0" y="963.0" width="20.7" height="15" fill="#f08c00" rx="2" ry="2"/>
+<text x="986.0" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_ioctl (1 samples, 1.75%)</title><rect x="983.0" y="947.0" width="20.7" height="15" fill="#ea8600" rx="2" ry="2"/>
+<text x="986.0" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>lock_sock_fast (1 samples, 1.75%)</title><rect x="983.0" y="931.0" width="20.7" height="15" fill="#da7600" rx="2" ry="2"/>
+<text x="986.0" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>inet_recvmsg (1 samples, 1.75%)</title><rect x="983.0" y="915.0" width="20.7" height="15" fill="#c56100" rx="2" ry="2"/>
+<text x="986.0" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_futex (1 samples, 1.75%)</title><rect x="983.0" y="899.0" width="20.7" height="15" fill="#e48000" rx="2" ry="2"/>
+<text x="986.0" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>hrtimer_wakeup (1 samples, 1.75%)</title><rect x="983.0" y="883.0" width="20.7" height="15" fill="#e37f00" rx="2" ry="2"/>
+<text x="986.0" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>futex_wait (1 samples, 1.75%)</title><rect x="983.0" y="867.0" width="20.7" height="15" fill="#e07c00" rx="2" ry="2"/>
+<text x="986.0" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/core/JobRunShell.run (9 samples, 15.79%)</title><rect x="1003.7" y="1107.0" width="186.3" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1006.7" y="1118.0">org/quartz/core/JobRunSh..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/core/QuartzScheduler.notifyJobStoreJobComplete (1 samples, 1.75%)</title><rect x="1003.7" y="1091.0" width="20.7" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="1006.7" y="1102.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.triggeredJobComplete (1 samples, 1.75%)</title><rect x="1003.7" y="1075.0" width="20.7" height="15" fill="#44d844" rx="2" ry="2"/>
+<text x="1006.7" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.retryExecuteInNonManagedTXLock (1 samples, 1.75%)</title><rect x="1003.7" y="1059.0" width="20.7" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="1006.7" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.executeInNonManagedTXLock (1 samples, 1.75%)</title><rect x="1003.7" y="1043.0" width="20.7" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="1006.7" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport$VoidTransactionCallback.execute (1 samples, 1.75%)</title><rect x="1003.7" y="1027.0" width="20.7" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="1006.7" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport$VoidTransactionCallback.execute (1 samples, 1.75%)</title><rect x="1003.7" y="1011.0" width="20.7" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="1006.7" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport$45.executeVoid (1 samples, 1.75%)</title><rect x="1003.7" y="995.0" width="20.7" height="15" fill="#51e451" rx="2" ry="2"/>
+<text x="1006.7" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.triggeredJobComplete (1 samples, 1.75%)</title><rect x="1003.7" y="979.0" width="20.7" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="1006.7" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.deleteFiredTrigger (1 samples, 1.75%)</title><rect x="1003.7" y="963.0" width="20.7" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1006.7" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.closeStatement (1 samples, 1.75%)</title><rect x="1003.7" y="947.0" width="20.7" height="15" fill="#40d440" rx="2" ry="2"/>
+<text x="1006.7" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingStatement.close (1 samples, 1.75%)</title><rect x="1003.7" y="931.0" width="20.7" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="1006.7" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/AbandonedTrace.removeTrace (1 samples, 1.75%)</title><rect x="1003.7" y="915.0" width="20.7" height="15" fill="#36cb36" rx="2" ry="2"/>
+<text x="1006.7" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/scheduling/quartz/QuartzJobBean.execute (8 samples, 14.04%)</title><rect x="1024.4" y="1091.0" width="165.6" height="15" fill="#37cd37" rx="2" ry="2"/>
+<text x="1027.4" y="1102.0">org/springframework/s..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/schedule/documentary/task/ActivityStatusTask.executeInternal (1 samples, 1.75%)</title><rect x="1024.4" y="1075.0" width="20.7" height="15" fill="#69fa69" rx="2" ry="2"/>
+<text x="1027.4" y="1086.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/schedule/documentary/service/impl/SeaSeason2ActivityServiceImpl.updateActivityStatusService (1 samples, 1.75%)</title><rect x="1024.4" y="1059.0" width="20.7" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="1027.4" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy199.getAllActivityByTime (1 samples, 1.75%)</title><rect x="1024.4" y="1043.0" width="20.7" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="1027.4" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/binding/MapperProxy.invoke (1 samples, 1.75%)</title><rect x="1024.4" y="1027.0" width="20.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1027.4" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/binding/MapperMethod.execute (1 samples, 1.75%)</title><rect x="1024.4" y="1011.0" width="20.7" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="1027.4" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/binding/MapperMethod.executeForMany (1 samples, 1.75%)</title><rect x="1024.4" y="995.0" width="20.7" height="15" fill="#43d743" rx="2" ry="2"/>
+<text x="1027.4" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/mybatis/spring/SqlSessionTemplate.selectList (1 samples, 1.75%)</title><rect x="1024.4" y="979.0" width="20.7" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="1027.4" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy48.selectList (1 samples, 1.75%)</title><rect x="1024.4" y="963.0" width="20.7" height="15" fill="#66f866" rx="2" ry="2"/>
+<text x="1027.4" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/mybatis/spring/SqlSessionTemplate$SqlSessionInterceptor.invoke (1 samples, 1.75%)</title><rect x="1024.4" y="947.0" width="20.7" height="15" fill="#46da46" rx="2" ry="2"/>
+<text x="1027.4" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/reflect/Method.invoke (1 samples, 1.75%)</title><rect x="1024.4" y="931.0" width="20.7" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="1027.4" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (1 samples, 1.75%)</title><rect x="1024.4" y="915.0" width="20.7" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="1027.4" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/GeneratedMethodAccessor43.invoke (1 samples, 1.75%)</title><rect x="1024.4" y="899.0" width="20.7" height="15" fill="#34c934" rx="2" ry="2"/>
+<text x="1027.4" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectList (1 samples, 1.75%)</title><rect x="1024.4" y="883.0" width="20.7" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="1027.4" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectList (1 samples, 1.75%)</title><rect x="1024.4" y="867.0" width="20.7" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="1027.4" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/CachingExecutor.query (1 samples, 1.75%)</title><rect x="1024.4" y="851.0" width="20.7" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="1027.4" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/CachingExecutor.query (1 samples, 1.75%)</title><rect x="1024.4" y="835.0" width="20.7" height="15" fill="#64f564" rx="2" ry="2"/>
+<text x="1027.4" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/BaseExecutor.query (1 samples, 1.75%)</title><rect x="1024.4" y="819.0" width="20.7" height="15" fill="#44d844" rx="2" ry="2"/>
+<text x="1027.4" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/BaseExecutor.queryFromDatabase (1 samples, 1.75%)</title><rect x="1024.4" y="803.0" width="20.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1027.4" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/SimpleExecutor.doQuery (1 samples, 1.75%)</title><rect x="1024.4" y="787.0" width="20.7" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="1027.4" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy208.query (1 samples, 1.75%)</title><rect x="1024.4" y="771.0" width="20.7" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="1027.4" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/plugin/Plugin.invoke (1 samples, 1.75%)</title><rect x="1024.4" y="755.0" width="20.7" height="15" fill="#38ce38" rx="2" ry="2"/>
+<text x="1027.4" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/reflect/Method.invoke (1 samples, 1.75%)</title><rect x="1024.4" y="739.0" width="20.7" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="1027.4" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (1 samples, 1.75%)</title><rect x="1024.4" y="723.0" width="20.7" height="15" fill="#60f360" rx="2" ry="2"/>
+<text x="1027.4" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/GeneratedMethodAccessor46.invoke (1 samples, 1.75%)</title><rect x="1024.4" y="707.0" width="20.7" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="1027.4" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/statement/RoutingStatementHandler.query (1 samples, 1.75%)</title><rect x="1024.4" y="691.0" width="20.7" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="1027.4" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/statement/PreparedStatementHandler.query (1 samples, 1.75%)</title><rect x="1024.4" y="675.0" width="20.7" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="1027.4" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.execute (1 samples, 1.75%)</title><rect x="1024.4" y="659.0" width="20.7" height="15" fill="#44d944" rx="2" ry="2"/>
+<text x="1027.4" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.execute (1 samples, 1.75%)</title><rect x="1024.4" y="643.0" width="20.7" height="15" fill="#4cdf4c" rx="2" ry="2"/>
+<text x="1027.4" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.execute (1 samples, 1.75%)</title><rect x="1024.4" y="627.0" width="20.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1027.4" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (1 samples, 1.75%)</title><rect x="1024.4" y="611.0" width="20.7" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="1027.4" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 1.75%)</title><rect x="1024.4" y="595.0" width="20.7" height="15" fill="#51e551" rx="2" ry="2"/>
+<text x="1027.4" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 1.75%)</title><rect x="1024.4" y="579.0" width="20.7" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="1027.4" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.sendCommand (1 samples, 1.75%)</title><rect x="1024.4" y="563.0" width="20.7" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="1027.4" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.checkErrorPacket (1 samples, 1.75%)</title><rect x="1024.4" y="547.0" width="20.7" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="1027.4" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 1.75%)</title><rect x="1024.4" y="531.0" width="20.7" height="15" fill="#48dc48" rx="2" ry="2"/>
+<text x="1027.4" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 1.75%)</title><rect x="1024.4" y="515.0" width="20.7" height="15" fill="#48dd48" rx="2" ry="2"/>
+<text x="1027.4" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.readFully (1 samples, 1.75%)</title><rect x="1024.4" y="499.0" width="20.7" height="15" fill="#44d844" rx="2" ry="2"/>
+<text x="1027.4" y="510.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/util/ReadAheadInputStream.read (1 samples, 1.75%)</title><rect x="1024.4" y="483.0" width="20.7" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="1027.4" y="494.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/util/ReadAheadInputStream.readFromUnderlyingStreamIfNecessary (1 samples, 1.75%)</title><rect x="1024.4" y="467.0" width="20.7" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="1027.4" y="478.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/util/ReadAheadInputStream.fill (1 samples, 1.75%)</title><rect x="1024.4" y="451.0" width="20.7" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="1027.4" y="462.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.read (1 samples, 1.75%)</title><rect x="1024.4" y="435.0" width="20.7" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="1027.4" y="446.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.read (1 samples, 1.75%)</title><rect x="1024.4" y="419.0" width="20.7" height="15" fill="#69fa69" rx="2" ry="2"/>
+<text x="1027.4" y="430.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.socketRead (1 samples, 1.75%)</title><rect x="1024.4" y="403.0" width="20.7" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="1027.4" y="414.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.socketRead0 (1 samples, 1.75%)</title><rect x="1024.4" y="387.0" width="20.7" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="1027.4" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.75%)</title><rect x="1024.4" y="371.0" width="20.7" height="15" fill="#ee6969" rx="2" ry="2"/>
+<text x="1027.4" y="382.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 1.75%)</title><rect x="1024.4" y="355.0" width="20.7" height="15" fill="#d26e00" rx="2" ry="2"/>
+<text x="1027.4" y="366.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (1 samples, 1.75%)</title><rect x="1024.4" y="339.0" width="20.7" height="15" fill="#e78300" rx="2" ry="2"/>
+<text x="1027.4" y="350.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_ioctl (1 samples, 1.75%)</title><rect x="1024.4" y="323.0" width="20.7" height="15" fill="#be5a00" rx="2" ry="2"/>
+<text x="1027.4" y="334.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (1 samples, 1.75%)</title><rect x="1024.4" y="307.0" width="20.7" height="15" fill="#e07c00" rx="2" ry="2"/>
+<text x="1027.4" y="318.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>SYSC_recvfrom (1 samples, 1.75%)</title><rect x="1024.4" y="291.0" width="20.7" height="15" fill="#f49000" rx="2" ry="2"/>
+<text x="1027.4" y="302.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>inet_recvmsg (1 samples, 1.75%)</title><rect x="1024.4" y="275.0" width="20.7" height="15" fill="#e68200" rx="2" ry="2"/>
+<text x="1027.4" y="286.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_sendmsg (1 samples, 1.75%)</title><rect x="1024.4" y="259.0" width="20.7" height="15" fill="#e78300" rx="2" ry="2"/>
+<text x="1027.4" y="270.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_recvmsg (1 samples, 1.75%)</title><rect x="1024.4" y="243.0" width="20.7" height="15" fill="#df7b00" rx="2" ry="2"/>
+<text x="1027.4" y="254.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>kmem_cache_free (1 samples, 1.75%)</title><rect x="1024.4" y="227.0" width="20.7" height="15" fill="#d87400" rx="2" ry="2"/>
+<text x="1027.4" y="238.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/schedule/documentary/task/PublishDocEpisodeTask.executeInternal (7 samples, 12.28%)</title><rect x="1045.1" y="1075.0" width="144.9" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="1048.1" y="1086.0">com/bilibili/sched..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/Logger.info (1 samples, 1.75%)</title><rect x="1045.1" y="1059.0" width="20.7" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="1048.1" y="1070.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/Logger.filterAndLog_0_Or3Plus (1 samples, 1.75%)</title><rect x="1045.1" y="1043.0" width="20.7" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="1048.1" y="1054.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/Logger.buildLoggingEventAndAppend (1 samples, 1.75%)</title><rect x="1045.1" y="1027.0" width="20.7" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="1048.1" y="1038.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/Logger.callAppenders (1 samples, 1.75%)</title><rect x="1045.1" y="1011.0" width="20.7" height="15" fill="#3bd03b" rx="2" ry="2"/>
+<text x="1048.1" y="1022.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/classic/Logger.appendLoopOnAppenders (1 samples, 1.75%)</title><rect x="1045.1" y="995.0" width="20.7" height="15" fill="#33c933" rx="2" ry="2"/>
+<text x="1048.1" y="1006.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/core/spi/AppenderAttachableImpl.appendLoopOnAppenders (1 samples, 1.75%)</title><rect x="1045.1" y="979.0" width="20.7" height="15" fill="#35cb35" rx="2" ry="2"/>
+<text x="1048.1" y="990.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>ch/qos/logback/core/AppenderBase.doAppend (1 samples, 1.75%)</title><rect x="1045.1" y="963.0" width="20.7" height="15" fill="#5bed5b" rx="2" ry="2"/>
+<text x="1048.1" y="974.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/LogAgentBase.append (1 samples, 1.75%)</title><rect x="1045.1" y="947.0" width="20.7" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="1048.1" y="958.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/UnixSocket.flush (1 samples, 1.75%)</title><rect x="1045.1" y="931.0" width="20.7" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="1048.1" y="942.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jnr/unixsocket/UnixDatagramChannel.send (1 samples, 1.75%)</title><rect x="1045.1" y="915.0" width="20.7" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="1048.1" y="926.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jnr/unixsocket/Native.sendto (1 samples, 1.75%)</title><rect x="1045.1" y="899.0" width="20.7" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="1048.1" y="910.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>jnr/unixsocket/Native$LibC$jnr$ffi$0.sendto (1 samples, 1.75%)</title><rect x="1045.1" y="883.0" width="20.7" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="1048.1" y="894.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/kenai/jffi/Invoker.invokeN6 (1 samples, 1.75%)</title><rect x="1045.1" y="867.0" width="20.7" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="1048.1" y="878.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/kenai/jffi/Foreign.invokeN6O2 (1 samples, 1.75%)</title><rect x="1045.1" y="851.0" width="20.7" height="15" fill="#44d844" rx="2" ry="2"/>
+<text x="1048.1" y="862.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>[unknown] (1 samples, 1.75%)</title><rect x="1045.1" y="835.0" width="20.7" height="15" fill="#d64646" rx="2" ry="2"/>
+<text x="1048.1" y="846.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libc-2.19.so (deleted) (1 samples, 1.75%)</title><rect x="1045.1" y="819.0" width="20.7" height="15" fill="#ec6666" rx="2" ry="2"/>
+<text x="1048.1" y="830.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 1.75%)</title><rect x="1045.1" y="803.0" width="20.7" height="15" fill="#f59100" rx="2" ry="2"/>
+<text x="1048.1" y="814.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (1 samples, 1.75%)</title><rect x="1045.1" y="787.0" width="20.7" height="15" fill="#c96500" rx="2" ry="2"/>
+<text x="1048.1" y="798.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_ioctl (1 samples, 1.75%)</title><rect x="1045.1" y="771.0" width="20.7" height="15" fill="#d47000" rx="2" ry="2"/>
+<text x="1048.1" y="782.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (1 samples, 1.75%)</title><rect x="1045.1" y="755.0" width="20.7" height="15" fill="#e98500" rx="2" ry="2"/>
+<text x="1048.1" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_vfs_ioctl (1 samples, 1.75%)</title><rect x="1045.1" y="739.0" width="20.7" height="15" fill="#f79300" rx="2" ry="2"/>
+<text x="1048.1" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>SYSC_sendto (1 samples, 1.75%)</title><rect x="1045.1" y="723.0" width="20.7" height="15" fill="#e88400" rx="2" ry="2"/>
+<text x="1048.1" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sock_sendmsg (1 samples, 1.75%)</title><rect x="1045.1" y="707.0" width="20.7" height="15" fill="#d26e00" rx="2" ry="2"/>
+<text x="1048.1" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>unix_dgram_sendmsg (1 samples, 1.75%)</title><rect x="1045.1" y="691.0" width="20.7" height="15" fill="#f79300" rx="2" ry="2"/>
+<text x="1048.1" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>skb_copy_datagram_from_iter (1 samples, 1.75%)</title><rect x="1045.1" y="675.0" width="20.7" height="15" fill="#ca6600" rx="2" ry="2"/>
+<text x="1048.1" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>copy_from_iter (1 samples, 1.75%)</title><rect x="1045.1" y="659.0" width="20.7" height="15" fill="#c86400" rx="2" ry="2"/>
+<text x="1048.1" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>copy_user_enhanced_fast_string (1 samples, 1.75%)</title><rect x="1045.1" y="643.0" width="20.7" height="15" fill="#de7a00" rx="2" ry="2"/>
+<text x="1048.1" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/schedule/documentary/service/impl/AllEpisode2TaskServiceImpl.publishAllEpisodeByTime (6 samples, 10.53%)</title><rect x="1065.8" y="1059.0" width="124.2" height="15" fill="#63f563" rx="2" ry="2"/>
+<text x="1068.8" y="1070.0">com/bilibili/sc..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy184.getEpisodeIdsByTime (6 samples, 10.53%)</title><rect x="1065.8" y="1043.0" width="124.2" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="1068.8" y="1054.0">com/sun/proxy/$..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/binding/MapperProxy.invoke (6 samples, 10.53%)</title><rect x="1065.8" y="1027.0" width="124.2" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="1068.8" y="1038.0">org/apache/ibat..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/binding/MapperMethod.execute (6 samples, 10.53%)</title><rect x="1065.8" y="1011.0" width="124.2" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="1068.8" y="1022.0">org/apache/ibat..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/binding/MapperMethod.executeForMany (6 samples, 10.53%)</title><rect x="1065.8" y="995.0" width="124.2" height="15" fill="#49dd49" rx="2" ry="2"/>
+<text x="1068.8" y="1006.0">org/apache/ibat..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/mybatis/spring/SqlSessionTemplate.selectList (6 samples, 10.53%)</title><rect x="1065.8" y="979.0" width="124.2" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="1068.8" y="990.0">org/mybatis/spr..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy48.selectList (6 samples, 10.53%)</title><rect x="1065.8" y="963.0" width="124.2" height="15" fill="#66f766" rx="2" ry="2"/>
+<text x="1068.8" y="974.0">com/sun/proxy/$..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/mybatis/spring/SqlSessionTemplate$SqlSessionInterceptor.invoke (6 samples, 10.53%)</title><rect x="1065.8" y="947.0" width="124.2" height="15" fill="#52e652" rx="2" ry="2"/>
+<text x="1068.8" y="958.0">org/mybatis/spr..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/reflect/Method.invoke (6 samples, 10.53%)</title><rect x="1065.8" y="931.0" width="124.2" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="1068.8" y="942.0">java/lang/refle..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (6 samples, 10.53%)</title><rect x="1065.8" y="915.0" width="124.2" height="15" fill="#69fb69" rx="2" ry="2"/>
+<text x="1068.8" y="926.0">sun/reflect/Del..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/GeneratedMethodAccessor43.invoke (6 samples, 10.53%)</title><rect x="1065.8" y="899.0" width="124.2" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1068.8" y="910.0">sun/reflect/Gen..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectList (6 samples, 10.53%)</title><rect x="1065.8" y="883.0" width="124.2" height="15" fill="#69fa69" rx="2" ry="2"/>
+<text x="1068.8" y="894.0">org/apache/ibat..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectList (6 samples, 10.53%)</title><rect x="1065.8" y="867.0" width="124.2" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="1068.8" y="878.0">org/apache/ibat..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/CachingExecutor.query (6 samples, 10.53%)</title><rect x="1065.8" y="851.0" width="124.2" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="1068.8" y="862.0">org/apache/ibat..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/CachingExecutor.query (6 samples, 10.53%)</title><rect x="1065.8" y="835.0" width="124.2" height="15" fill="#4fe34f" rx="2" ry="2"/>
+<text x="1068.8" y="846.0">org/apache/ibat..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/BaseExecutor.query (6 samples, 10.53%)</title><rect x="1065.8" y="819.0" width="124.2" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="1068.8" y="830.0">org/apache/ibat..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/BaseExecutor.queryFromDatabase (6 samples, 10.53%)</title><rect x="1065.8" y="803.0" width="124.2" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="1068.8" y="814.0">org/apache/ibat..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/SimpleExecutor.doQuery (6 samples, 10.53%)</title><rect x="1065.8" y="787.0" width="124.2" height="15" fill="#61f361" rx="2" ry="2"/>
+<text x="1068.8" y="798.0">org/apache/ibat..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy208.query (2 samples, 3.51%)</title><rect x="1065.8" y="771.0" width="41.4" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="1068.8" y="782.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/plugin/Plugin.invoke (2 samples, 3.51%)</title><rect x="1065.8" y="755.0" width="41.4" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1068.8" y="766.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/reflect/Method.invoke (2 samples, 3.51%)</title><rect x="1065.8" y="739.0" width="41.4" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="1068.8" y="750.0">jav..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (2 samples, 3.51%)</title><rect x="1065.8" y="723.0" width="41.4" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="1068.8" y="734.0">sun..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/GeneratedMethodAccessor46.invoke (2 samples, 3.51%)</title><rect x="1065.8" y="707.0" width="41.4" height="15" fill="#6afb6a" rx="2" ry="2"/>
+<text x="1068.8" y="718.0">sun..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/statement/RoutingStatementHandler.query (2 samples, 3.51%)</title><rect x="1065.8" y="691.0" width="41.4" height="15" fill="#45d945" rx="2" ry="2"/>
+<text x="1068.8" y="702.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/statement/PreparedStatementHandler.query (2 samples, 3.51%)</title><rect x="1065.8" y="675.0" width="41.4" height="15" fill="#66f866" rx="2" ry="2"/>
+<text x="1068.8" y="686.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.execute (2 samples, 3.51%)</title><rect x="1065.8" y="659.0" width="41.4" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1068.8" y="670.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.execute (2 samples, 3.51%)</title><rect x="1065.8" y="643.0" width="41.4" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="1068.8" y="654.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.execute (2 samples, 3.51%)</title><rect x="1065.8" y="627.0" width="41.4" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="1068.8" y="638.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (2 samples, 3.51%)</title><rect x="1065.8" y="611.0" width="41.4" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="1068.8" y="622.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (2 samples, 3.51%)</title><rect x="1065.8" y="595.0" width="41.4" height="15" fill="#61f361" rx="2" ry="2"/>
+<text x="1068.8" y="606.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (2 samples, 3.51%)</title><rect x="1065.8" y="579.0" width="41.4" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="1068.8" y="590.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.readAllResults (1 samples, 1.75%)</title><rect x="1065.8" y="563.0" width="20.7" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="1068.8" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.clearInputStream (1 samples, 1.75%)</title><rect x="1065.8" y="547.0" width="20.7" height="15" fill="#4ee14e" rx="2" ry="2"/>
+<text x="1068.8" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/util/ReadAheadInputStream.available (1 samples, 1.75%)</title><rect x="1065.8" y="531.0" width="20.7" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="1068.8" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.readResultsForQueryOrUpdate (1 samples, 1.75%)</title><rect x="1065.8" y="515.0" width="20.7" height="15" fill="#61f361" rx="2" ry="2"/>
+<text x="1068.8" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.sendCommand (1 samples, 1.75%)</title><rect x="1086.5" y="563.0" width="20.7" height="15" fill="#65f765" rx="2" ry="2"/>
+<text x="1089.5" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.checkErrorPacket (1 samples, 1.75%)</title><rect x="1086.5" y="547.0" width="20.7" height="15" fill="#66f866" rx="2" ry="2"/>
+<text x="1089.5" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 1.75%)</title><rect x="1086.5" y="531.0" width="20.7" height="15" fill="#59ec59" rx="2" ry="2"/>
+<text x="1089.5" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 1.75%)</title><rect x="1086.5" y="515.0" width="20.7" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="1089.5" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.readFully (1 samples, 1.75%)</title><rect x="1086.5" y="499.0" width="20.7" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="1089.5" y="510.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/util/ReadAheadInputStream.read (1 samples, 1.75%)</title><rect x="1086.5" y="483.0" width="20.7" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1089.5" y="494.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/util/ReadAheadInputStream.readFromUnderlyingStreamIfNecessary (1 samples, 1.75%)</title><rect x="1086.5" y="467.0" width="20.7" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="1089.5" y="478.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/util/ReadAheadInputStream.fill (1 samples, 1.75%)</title><rect x="1086.5" y="451.0" width="20.7" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="1089.5" y="462.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.read (1 samples, 1.75%)</title><rect x="1086.5" y="435.0" width="20.7" height="15" fill="#3ad03a" rx="2" ry="2"/>
+<text x="1089.5" y="446.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.read (1 samples, 1.75%)</title><rect x="1086.5" y="419.0" width="20.7" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="1089.5" y="430.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.socketRead (1 samples, 1.75%)</title><rect x="1086.5" y="403.0" width="20.7" height="15" fill="#33c933" rx="2" ry="2"/>
+<text x="1089.5" y="414.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.socketRead0 (1 samples, 1.75%)</title><rect x="1086.5" y="387.0" width="20.7" height="15" fill="#5cee5c" rx="2" ry="2"/>
+<text x="1089.5" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 1.75%)</title><rect x="1086.5" y="371.0" width="20.7" height="15" fill="#e45b5b" rx="2" ry="2"/>
+<text x="1089.5" y="382.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 1.75%)</title><rect x="1086.5" y="355.0" width="20.7" height="15" fill="#f49000" rx="2" ry="2"/>
+<text x="1089.5" y="366.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (1 samples, 1.75%)</title><rect x="1086.5" y="339.0" width="20.7" height="15" fill="#df7b00" rx="2" ry="2"/>
+<text x="1089.5" y="350.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_ioctl (1 samples, 1.75%)</title><rect x="1086.5" y="323.0" width="20.7" height="15" fill="#c56100" rx="2" ry="2"/>
+<text x="1089.5" y="334.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_futex (1 samples, 1.75%)</title><rect x="1086.5" y="307.0" width="20.7" height="15" fill="#dd7900" rx="2" ry="2"/>
+<text x="1089.5" y="318.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>SYSC_recvfrom (1 samples, 1.75%)</title><rect x="1086.5" y="291.0" width="20.7" height="15" fill="#df7b00" rx="2" ry="2"/>
+<text x="1089.5" y="302.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>inet_recvmsg (1 samples, 1.75%)</title><rect x="1086.5" y="275.0" width="20.7" height="15" fill="#c15d00" rx="2" ry="2"/>
+<text x="1089.5" y="286.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_sendmsg (1 samples, 1.75%)</title><rect x="1086.5" y="259.0" width="20.7" height="15" fill="#f28e00" rx="2" ry="2"/>
+<text x="1089.5" y="270.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_recvmsg (1 samples, 1.75%)</title><rect x="1086.5" y="243.0" width="20.7" height="15" fill="#d77300" rx="2" ry="2"/>
+<text x="1089.5" y="254.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_prequeue_process (1 samples, 1.75%)</title><rect x="1086.5" y="227.0" width="20.7" height="15" fill="#e78300" rx="2" ry="2"/>
+<text x="1089.5" y="238.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_v4_do_rcv (1 samples, 1.75%)</title><rect x="1086.5" y="211.0" width="20.7" height="15" fill="#db7700" rx="2" ry="2"/>
+<text x="1089.5" y="222.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_rcv_established (1 samples, 1.75%)</title><rect x="1086.5" y="195.0" width="20.7" height="15" fill="#c76300" rx="2" ry="2"/>
+<text x="1089.5" y="206.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>tcp_data_queue (1 samples, 1.75%)</title><rect x="1086.5" y="179.0" width="20.7" height="15" fill="#d87400" rx="2" ry="2"/>
+<text x="1089.5" y="190.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sock_def_readable (1 samples, 1.75%)</title><rect x="1086.5" y="163.0" width="20.7" height="15" fill="#ce6a00" rx="2" ry="2"/>
+<text x="1089.5" y="174.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/SimpleExecutor.prepareStatement (4 samples, 7.02%)</title><rect x="1107.2" y="771.0" width="82.8" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="1110.2" y="782.0">org/apach..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy208.parameterize (1 samples, 1.75%)</title><rect x="1107.2" y="755.0" width="20.7" height="15" fill="#33c833" rx="2" ry="2"/>
+<text x="1110.2" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/plugin/Plugin.invoke (1 samples, 1.75%)</title><rect x="1107.2" y="739.0" width="20.7" height="15" fill="#5def5d" rx="2" ry="2"/>
+<text x="1110.2" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/reflect/Method.invoke (1 samples, 1.75%)</title><rect x="1107.2" y="723.0" width="20.7" height="15" fill="#54e754" rx="2" ry="2"/>
+<text x="1110.2" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (1 samples, 1.75%)</title><rect x="1107.2" y="707.0" width="20.7" height="15" fill="#62f462" rx="2" ry="2"/>
+<text x="1110.2" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/GeneratedMethodAccessor45.invoke (1 samples, 1.75%)</title><rect x="1107.2" y="691.0" width="20.7" height="15" fill="#54e854" rx="2" ry="2"/>
+<text x="1110.2" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/statement/RoutingStatementHandler.parameterize (1 samples, 1.75%)</title><rect x="1107.2" y="675.0" width="20.7" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="1110.2" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/statement/PreparedStatementHandler.parameterize (1 samples, 1.75%)</title><rect x="1107.2" y="659.0" width="20.7" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="1110.2" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/scripting/defaults/DefaultParameterHandler.setParameters (1 samples, 1.75%)</title><rect x="1107.2" y="643.0" width="20.7" height="15" fill="#6dfe6d" rx="2" ry="2"/>
+<text x="1110.2" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/type/BaseTypeHandler.setParameter (1 samples, 1.75%)</title><rect x="1107.2" y="627.0" width="20.7" height="15" fill="#35cb35" rx="2" ry="2"/>
+<text x="1110.2" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/type/UnknownTypeHandler.setNonNullParameter (1 samples, 1.75%)</title><rect x="1107.2" y="611.0" width="20.7" height="15" fill="#36cc36" rx="2" ry="2"/>
+<text x="1110.2" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/type/BaseTypeHandler.setParameter (1 samples, 1.75%)</title><rect x="1107.2" y="595.0" width="20.7" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="1110.2" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/type/DateTypeHandler.setNonNullParameter (1 samples, 1.75%)</title><rect x="1107.2" y="579.0" width="20.7" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1110.2" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/type/DateTypeHandler.setNonNullParameter (1 samples, 1.75%)</title><rect x="1107.2" y="563.0" width="20.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1110.2" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.setTimestamp (1 samples, 1.75%)</title><rect x="1107.2" y="547.0" width="20.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1110.2" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.setTimestamp (1 samples, 1.75%)</title><rect x="1107.2" y="531.0" width="20.7" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="1110.2" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.setTimestamp (1 samples, 1.75%)</title><rect x="1107.2" y="515.0" width="20.7" height="15" fill="#69fa69" rx="2" ry="2"/>
+<text x="1110.2" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.setTimestampInternal (1 samples, 1.75%)</title><rect x="1107.2" y="499.0" width="20.7" height="15" fill="#5ef05e" rx="2" ry="2"/>
+<text x="1110.2" y="510.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/text/DateFormat.format (1 samples, 1.75%)</title><rect x="1107.2" y="483.0" width="20.7" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="1110.2" y="494.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/text/SimpleDateFormat.format (1 samples, 1.75%)</title><rect x="1107.2" y="467.0" width="20.7" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="1110.2" y="478.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/text/SimpleDateFormat.format (1 samples, 1.75%)</title><rect x="1107.2" y="451.0" width="20.7" height="15" fill="#65f665" rx="2" ry="2"/>
+<text x="1110.2" y="462.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/sun/proxy/$Proxy208.prepare (2 samples, 3.51%)</title><rect x="1127.9" y="755.0" width="41.4" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="1130.9" y="766.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/plugin/Plugin.invoke (2 samples, 3.51%)</title><rect x="1127.9" y="739.0" width="41.4" height="15" fill="#6afc6a" rx="2" ry="2"/>
+<text x="1130.9" y="750.0">org..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/common/dao/interceptor/PaginationInterceptor.intercept (2 samples, 3.51%)</title><rect x="1127.9" y="723.0" width="41.4" height="15" fill="#67f967" rx="2" ry="2"/>
+<text x="1130.9" y="734.0">com..</text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/bilibili/app/bangumi/common/dao/interceptor/PaginationInterceptor.needPagination (1 samples, 1.75%)</title><rect x="1127.9" y="707.0" width="20.7" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="1130.9" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/regex/Matcher.find (1 samples, 1.75%)</title><rect x="1127.9" y="691.0" width="20.7" height="15" fill="#46da46" rx="2" ry="2"/>
+<text x="1130.9" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/regex/Matcher.search (1 samples, 1.75%)</title><rect x="1127.9" y="675.0" width="20.7" height="15" fill="#52e552" rx="2" ry="2"/>
+<text x="1130.9" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/regex/Pattern$Start.match (1 samples, 1.75%)</title><rect x="1127.9" y="659.0" width="20.7" height="15" fill="#3fd43f" rx="2" ry="2"/>
+<text x="1130.9" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/util/regex/Pattern$BmpCharProperty.match (1 samples, 1.75%)</title><rect x="1127.9" y="643.0" width="20.7" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="1130.9" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/plugin/Invocation.proceed (1 samples, 1.75%)</title><rect x="1148.6" y="707.0" width="20.7" height="15" fill="#6afc6a" rx="2" ry="2"/>
+<text x="1151.6" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/reflect/Method.invoke (1 samples, 1.75%)</title><rect x="1148.6" y="691.0" width="20.7" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="1151.6" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (1 samples, 1.75%)</title><rect x="1148.6" y="675.0" width="20.7" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="1151.6" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/GeneratedMethodAccessor44.invoke (1 samples, 1.75%)</title><rect x="1148.6" y="659.0" width="20.7" height="15" fill="#6cfd6c" rx="2" ry="2"/>
+<text x="1151.6" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/statement/RoutingStatementHandler.prepare (1 samples, 1.75%)</title><rect x="1148.6" y="643.0" width="20.7" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="1151.6" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/statement/BaseStatementHandler.prepare (1 samples, 1.75%)</title><rect x="1148.6" y="627.0" width="20.7" height="15" fill="#4de14d" rx="2" ry="2"/>
+<text x="1151.6" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/statement/PreparedStatementHandler.instantiateStatement (1 samples, 1.75%)</title><rect x="1148.6" y="611.0" width="20.7" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="1151.6" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingConnection.prepareStatement (1 samples, 1.75%)</title><rect x="1148.6" y="595.0" width="20.7" height="15" fill="#5ff25f" rx="2" ry="2"/>
+<text x="1151.6" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/DelegatingConnection.prepareStatement (1 samples, 1.75%)</title><rect x="1148.6" y="579.0" width="20.7" height="15" fill="#68f968" rx="2" ry="2"/>
+<text x="1151.6" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.prepareStatement (1 samples, 1.75%)</title><rect x="1148.6" y="563.0" width="20.7" height="15" fill="#41d641" rx="2" ry="2"/>
+<text x="1151.6" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.prepareStatement (1 samples, 1.75%)</title><rect x="1148.6" y="547.0" width="20.7" height="15" fill="#5ff15f" rx="2" ry="2"/>
+<text x="1151.6" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.clientPrepareStatement (1 samples, 1.75%)</title><rect x="1148.6" y="531.0" width="20.7" height="15" fill="#6bfc6b" rx="2" ry="2"/>
+<text x="1151.6" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.getInstance (1 samples, 1.75%)</title><rect x="1148.6" y="515.0" width="20.7" height="15" fill="#45da45" rx="2" ry="2"/>
+<text x="1151.6" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/Util.handleNewInstance (1 samples, 1.75%)</title><rect x="1148.6" y="499.0" width="20.7" height="15" fill="#4ade4a" rx="2" ry="2"/>
+<text x="1151.6" y="510.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/lang/reflect/Constructor.newInstance (1 samples, 1.75%)</title><rect x="1148.6" y="483.0" width="20.7" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="1151.6" y="494.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/DelegatingConstructorAccessorImpl.newInstance (1 samples, 1.75%)</title><rect x="1148.6" y="467.0" width="20.7" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="1151.6" y="478.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sun/reflect/GeneratedConstructorAccessor47.newInstance (1 samples, 1.75%)</title><rect x="1148.6" y="451.0" width="20.7" height="15" fill="#57ea57" rx="2" ry="2"/>
+<text x="1151.6" y="462.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/JDBC4PreparedStatement.&lt;init&gt; (1 samples, 1.75%)</title><rect x="1148.6" y="435.0" width="20.7" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="1151.6" y="446.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.&lt;init&gt; (1 samples, 1.75%)</title><rect x="1148.6" y="419.0" width="20.7" height="15" fill="#4ee24e" rx="2" ry="2"/>
+<text x="1151.6" y="430.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement$ParseInfo.&lt;init&gt; (1 samples, 1.75%)</title><rect x="1148.6" y="403.0" width="20.7" height="15" fill="#47db47" rx="2" ry="2"/>
+<text x="1151.6" y="414.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement$ParseInfo.&lt;init&gt; (1 samples, 1.75%)</title><rect x="1148.6" y="387.0" width="20.7" height="15" fill="#59eb59" rx="2" ry="2"/>
+<text x="1151.6" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/StatementImpl.getOnDuplicateKeyLocation (1 samples, 1.75%)</title><rect x="1148.6" y="371.0" width="20.7" height="15" fill="#68fa68" rx="2" ry="2"/>
+<text x="1151.6" y="382.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/StringUtils.indexOfIgnoreCaseRespectMarker (1 samples, 1.75%)</title><rect x="1148.6" y="355.0" width="20.7" height="15" fill="#3ed33e" rx="2" ry="2"/>
+<text x="1151.6" y="366.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/StringUtils.startsWithIgnoreCase (1 samples, 1.75%)</title><rect x="1148.6" y="339.0" width="20.7" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="1151.6" y="350.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/ibatis/executor/BaseExecutor.getConnection (1 samples, 1.75%)</title><rect x="1169.3" y="755.0" width="20.7" height="15" fill="#65f765" rx="2" ry="2"/>
+<text x="1172.3" y="766.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/mybatis/spring/transaction/SpringManagedTransaction.getConnection (1 samples, 1.75%)</title><rect x="1169.3" y="739.0" width="20.7" height="15" fill="#38ce38" rx="2" ry="2"/>
+<text x="1172.3" y="750.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/mybatis/spring/transaction/SpringManagedTransaction.openConnection (1 samples, 1.75%)</title><rect x="1169.3" y="723.0" width="20.7" height="15" fill="#48dc48" rx="2" ry="2"/>
+<text x="1172.3" y="734.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/jdbc/datasource/DataSourceUtils.getConnection (1 samples, 1.75%)</title><rect x="1169.3" y="707.0" width="20.7" height="15" fill="#3dd23d" rx="2" ry="2"/>
+<text x="1172.3" y="718.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/springframework/jdbc/datasource/DataSourceUtils.doGetConnection (1 samples, 1.75%)</title><rect x="1169.3" y="691.0" width="20.7" height="15" fill="#58eb58" rx="2" ry="2"/>
+<text x="1172.3" y="702.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/BasicDataSource.getConnection (1 samples, 1.75%)</title><rect x="1169.3" y="675.0" width="20.7" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1172.3" y="686.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolingDataSource.getConnection (1 samples, 1.75%)</title><rect x="1169.3" y="659.0" width="20.7" height="15" fill="#5aed5a" rx="2" ry="2"/>
+<text x="1172.3" y="670.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/pool2/impl/GenericObjectPool.borrowObject (1 samples, 1.75%)</title><rect x="1169.3" y="643.0" width="20.7" height="15" fill="#55e855" rx="2" ry="2"/>
+<text x="1172.3" y="654.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/pool2/impl/GenericObjectPool.borrowObject (1 samples, 1.75%)</title><rect x="1169.3" y="627.0" width="20.7" height="15" fill="#35cb35" rx="2" ry="2"/>
+<text x="1172.3" y="638.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolableConnectionFactory.validateObject (1 samples, 1.75%)</title><rect x="1169.3" y="611.0" width="20.7" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="1172.3" y="622.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolableConnectionFactory.validateConnection (1 samples, 1.75%)</title><rect x="1169.3" y="595.0" width="20.7" height="15" fill="#53e653" rx="2" ry="2"/>
+<text x="1172.3" y="606.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>org/apache/commons/dbcp2/PoolableConnection.validate (1 samples, 1.75%)</title><rect x="1169.3" y="579.0" width="20.7" height="15" fill="#40d540" rx="2" ry="2"/>
+<text x="1172.3" y="590.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.executeQuery (1 samples, 1.75%)</title><rect x="1169.3" y="563.0" width="20.7" height="15" fill="#33c933" rx="2" ry="2"/>
+<text x="1172.3" y="574.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (1 samples, 1.75%)</title><rect x="1169.3" y="547.0" width="20.7" height="15" fill="#46da46" rx="2" ry="2"/>
+<text x="1172.3" y="558.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 1.75%)</title><rect x="1169.3" y="531.0" width="20.7" height="15" fill="#32c832" rx="2" ry="2"/>
+<text x="1172.3" y="542.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 1.75%)</title><rect x="1169.3" y="515.0" width="20.7" height="15" fill="#69fa69" rx="2" ry="2"/>
+<text x="1172.3" y="526.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.readAllResults (1 samples, 1.75%)</title><rect x="1169.3" y="499.0" width="20.7" height="15" fill="#56e956" rx="2" ry="2"/>
+<text x="1172.3" y="510.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/MysqlIO.clearInputStream (1 samples, 1.75%)</title><rect x="1169.3" y="483.0" width="20.7" height="15" fill="#60f260" rx="2" ry="2"/>
+<text x="1172.3" y="494.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>com/mysql/jdbc/util/ReadAheadInputStream.available (1 samples, 1.75%)</title><rect x="1169.3" y="467.0" width="20.7" height="15" fill="#67f867" rx="2" ry="2"/>
+<text x="1172.3" y="478.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/SocketInputStream.available (1 samples, 1.75%)</title><rect x="1169.3" y="451.0" width="20.7" height="15" fill="#69fb69" rx="2" ry="2"/>
+<text x="1172.3" y="462.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/AbstractPlainSocketImpl.available (1 samples, 1.75%)</title><rect x="1169.3" y="435.0" width="20.7" height="15" fill="#3cd13c" rx="2" ry="2"/>
+<text x="1172.3" y="446.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>java/net/PlainSocketImpl.socketAvailable (1 samples, 1.75%)</title><rect x="1169.3" y="419.0" width="20.7" height="15" fill="#4ce04c" rx="2" ry="2"/>
+<text x="1172.3" y="430.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>Java_java_net_PlainSocketImpl_socketAvailable (1 samples, 1.75%)</title><rect x="1169.3" y="403.0" width="20.7" height="15" fill="#e25959" rx="2" ry="2"/>
+<text x="1172.3" y="414.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>/lib/x86_64-linux-gnu/libc-2.19.so (deleted) (1 samples, 1.75%)</title><rect x="1169.3" y="387.0" width="20.7" height="15" fill="#f37171" rx="2" ry="2"/>
+<text x="1172.3" y="398.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 1.75%)</title><rect x="1169.3" y="371.0" width="20.7" height="15" fill="#e78300" rx="2" ry="2"/>
+<text x="1172.3" y="382.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>do_syscall_64 (1 samples, 1.75%)</title><rect x="1169.3" y="355.0" width="20.7" height="15" fill="#fc9800" rx="2" ry="2"/>
+<text x="1172.3" y="366.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>sys_ioctl (1 samples, 1.75%)</title><rect x="1169.3" y="339.0" width="20.7" height="15" fill="#c86400" rx="2" ry="2"/>
+<text x="1172.3" y="350.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__fget_light (1 samples, 1.75%)</title><rect x="1169.3" y="323.0" width="20.7" height="15" fill="#d16d00" rx="2" ry="2"/>
+<text x="1172.3" y="334.0"></text>
+</g>
+<g class="func_g" onmouseover="s(this)" onmouseout="c()" onclick="zoom(this)">
+<title>__fget (1 samples, 1.75%)</title><rect x="1169.3" y="307.0" width="20.7" height="15" fill="#f79300" rx="2" ry="2"/>
+<text x="1172.3" y="318.0"></text>
+</g>
+</svg>
