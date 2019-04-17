@@ -1,0 +1,2445 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" width="1200" height="1030" onload="init(evt)" viewBox="0 0 1200 1030" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<!-- Flame graph stack visualization. See https://github.com/brendangregg/FlameGraph for latest version, and http://www.brendangregg.com/flamegraphs.html for examples. -->
+<!-- NOTES:  -->
+<defs>
+	<linearGradient id="background" y1="0" y2="1" x1="0" x2="0" >
+		<stop stop-color="#eeeeee" offset="5%" />
+		<stop stop-color="#eeeeb0" offset="95%" />
+	</linearGradient>
+</defs>
+<style type="text/css">
+	text { font-family:Verdana; font-size:12px; fill:rgb(0,0,0); }
+	#search { opacity:0.1; cursor:pointer; }
+	#search:hover, #search.show { opacity:1; }
+	#subtitle { text-anchor:middle; font-color:rgb(160,160,160); }
+	#title { text-anchor:middle; font-size:17px}
+	#unzoom { cursor:pointer; }
+	#frames > *:hover { stroke:black; stroke-width:0.5; cursor:pointer; }
+	.hide { display:none; }
+	.parent { opacity:0.5; }
+</style>
+<script type="text/ecmascript">
+<![CDATA[
+	"use strict";
+	var details, searchbtn, unzoombtn, matchedtxt, svg, searching;
+	function init(evt) {
+		details = document.getElementById("details").firstChild;
+		searchbtn = document.getElementById("search");
+		unzoombtn = document.getElementById("unzoom");
+		matchedtxt = document.getElementById("matched");
+		svg = document.getElementsByTagName("svg")[0];
+		searching = 0;
+	}
+
+	window.addEventListener("click", function(e) {
+		var target = find_group(e.target);
+		if (target) {
+			if (target.nodeName == "a") {
+				if (e.ctrlKey === false) return;
+				e.preventDefault();
+			}
+			if (target.classList.contains("parent")) unzoom();
+			zoom(target);
+		}
+		else if (e.target.id == "unzoom") unzoom();
+		else if (e.target.id == "search") search_prompt();
+	}, false)
+
+	// mouse-over for info
+	// show
+	window.addEventListener("mouseover", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = "Function: " + g_to_text(target);
+	}, false)
+
+	// clear
+	window.addEventListener("mouseout", function(e) {
+		var target = find_group(e.target);
+		if (target) details.nodeValue = ' ';
+	}, false)
+
+	// ctrl-F for search
+	window.addEventListener("keydown",function (e) {
+		if (e.keyCode === 114 || (e.ctrlKey && e.keyCode === 70)) {
+			e.preventDefault();
+			search_prompt();
+		}
+	}, false)
+
+	// functions
+	function find_child(node, selector) {
+		var children = node.querySelectorAll(selector);
+		if (children.length) return children[0];
+		return;
+	}
+	function find_group(node) {
+		var parent = node.parentElement;
+		if (!parent) return;
+		if (parent.id == "frames") return node;
+		return find_group(parent);
+	}
+	function orig_save(e, attr, val) {
+		if (e.attributes["_orig_" + attr] != undefined) return;
+		if (e.attributes[attr] == undefined) return;
+		if (val == undefined) val = e.attributes[attr].value;
+		e.setAttribute("_orig_" + attr, val);
+	}
+	function orig_load(e, attr) {
+		if (e.attributes["_orig_"+attr] == undefined) return;
+		e.attributes[attr].value = e.attributes["_orig_" + attr].value;
+		e.removeAttribute("_orig_"+attr);
+	}
+	function g_to_text(e) {
+		var text = find_child(e, "title").firstChild.nodeValue;
+		return (text)
+	}
+	function g_to_func(e) {
+		var func = g_to_text(e);
+		// if there's any manipulation we want to do to the function
+		// name before it's searched, do it here before returning.
+		return (func);
+	}
+	function update_text(e) {
+		var r = find_child(e, "rect");
+		var t = find_child(e, "text");
+		var w = parseFloat(r.attributes.width.value) -3;
+		var txt = find_child(e, "title").textContent.replace(/\([^(]*\)$/,"");
+		t.attributes.x.value = parseFloat(r.attributes.x.value) + 3;
+
+		// Smaller than this size won't fit anything
+		if (w < 2 * 12 * 0.59) {
+			t.textContent = "";
+			return;
+		}
+
+		t.textContent = txt;
+		// Fit in full text width
+		if (/^ *$/.test(txt) || t.getSubStringLength(0, txt.length) < w)
+			return;
+
+		for (var x = txt.length - 2; x > 0; x--) {
+			if (t.getSubStringLength(0, x + 2) <= w) {
+				t.textContent = txt.substring(0, x) + "..";
+				return;
+			}
+		}
+		t.textContent = "";
+	}
+
+	// zoom
+	function zoom_reset(e) {
+		if (e.attributes != undefined) {
+			orig_load(e, "x");
+			orig_load(e, "width");
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_reset(c[i]);
+		}
+	}
+	function zoom_child(e, x, ratio) {
+		if (e.attributes != undefined) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = (parseFloat(e.attributes.x.value) - x - 10) * ratio + 10;
+				if (e.tagName == "text")
+					e.attributes.x.value = find_child(e.parentNode, "rect[x]").attributes.x.value + 3;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseFloat(e.attributes.width.value) * ratio;
+			}
+		}
+
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_child(c[i], x - 10, ratio);
+		}
+	}
+	function zoom_parent(e) {
+		if (e.attributes) {
+			if (e.attributes.x != undefined) {
+				orig_save(e, "x");
+				e.attributes.x.value = 10;
+			}
+			if (e.attributes.width != undefined) {
+				orig_save(e, "width");
+				e.attributes.width.value = parseInt(svg.width.baseVal.value) - (10 * 2);
+			}
+		}
+		if (e.childNodes == undefined) return;
+		for (var i = 0, c = e.childNodes; i < c.length; i++) {
+			zoom_parent(c[i]);
+		}
+	}
+	function zoom(node) {
+		var attr = find_child(node, "rect").attributes;
+		var width = parseFloat(attr.width.value);
+		var xmin = parseFloat(attr.x.value);
+		var xmax = parseFloat(xmin + width);
+		var ymin = parseFloat(attr.y.value);
+		var ratio = (svg.width.baseVal.value - 2 * 10) / width;
+
+		// XXX: Workaround for JavaScript float issues (fix me)
+		var fudge = 0.0001;
+
+		unzoombtn.classList.remove("hide");
+
+		var el = document.getElementById("frames").children;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var a = find_child(e, "rect").attributes;
+			var ex = parseFloat(a.x.value);
+			var ew = parseFloat(a.width.value);
+			var upstack;
+			// Is it an ancestor
+			if (0 == 0) {
+				upstack = parseFloat(a.y.value) > ymin;
+			} else {
+				upstack = parseFloat(a.y.value) < ymin;
+			}
+			if (upstack) {
+				// Direct ancestor
+				if (ex <= xmin && (ex+ew+fudge) >= xmax) {
+					e.classList.add("parent");
+					zoom_parent(e);
+					update_text(e);
+				}
+				// not in current path
+				else
+					e.classList.add("hide");
+			}
+			// Children maybe
+			else {
+				// no common path
+				if (ex < xmin || ex + fudge >= xmax) {
+					e.classList.add("hide");
+				}
+				else {
+					zoom_child(e, xmin, ratio);
+					update_text(e);
+				}
+			}
+		}
+	}
+	function unzoom() {
+		unzoombtn.classList.add("hide");
+		var el = document.getElementById("frames").children;
+		for(var i = 0; i < el.length; i++) {
+			el[i].classList.remove("parent");
+			el[i].classList.remove("hide");
+			zoom_reset(el[i]);
+			update_text(el[i]);
+		}
+	}
+
+	// search
+	function reset_search() {
+		var el = document.querySelectorAll("#frames rect");
+		for (var i = 0; i < el.length; i++) {
+			orig_load(el[i], "fill")
+		}
+	}
+	function search_prompt() {
+		if (!searching) {
+			var term = prompt("Enter a search term (regexp " +
+			    "allowed, eg: ^ext4_)", "");
+			if (term != null) {
+				search(term)
+			}
+		} else {
+			reset_search();
+			searching = 0;
+			searchbtn.classList.remove("show");
+			searchbtn.firstChild.nodeValue = "Search"
+			matchedtxt.classList.add("hide");
+			matchedtxt.firstChild.nodeValue = ""
+		}
+	}
+	function search(term) {
+		var re = new RegExp(term);
+		var el = document.getElementById("frames").children;
+		var matches = new Object();
+		var maxwidth = 0;
+		for (var i = 0; i < el.length; i++) {
+			var e = el[i];
+			var func = g_to_func(e);
+			var rect = find_child(e, "rect");
+			if (func == null || rect == null)
+				continue;
+
+			// Save max width. Only works as we have a root frame
+			var w = parseFloat(rect.attributes.width.value);
+			if (w > maxwidth)
+				maxwidth = w;
+
+			if (func.match(re)) {
+				// highlight
+				var x = parseFloat(rect.attributes.x.value);
+				orig_save(rect, "fill");
+				rect.attributes.fill.value = "rgb(230,0,230)";
+
+				// remember matches
+				if (matches[x] == undefined) {
+					matches[x] = w;
+				} else {
+					if (w > matches[x]) {
+						// overwrite with parent
+						matches[x] = w;
+					}
+				}
+				searching = 1;
+			}
+		}
+		if (!searching)
+			return;
+
+		searchbtn.classList.add("show");
+		searchbtn.firstChild.nodeValue = "Reset Search";
+
+		// calculate percent matched, excluding vertical overlap
+		var count = 0;
+		var lastx = -1;
+		var lastw = 0;
+		var keys = Array();
+		for (k in matches) {
+			if (matches.hasOwnProperty(k))
+				keys.push(k);
+		}
+		// sort the matched frames by their x location
+		// ascending, then width descending
+		keys.sort(function(a, b){
+			return a - b;
+		});
+		// Step through frames saving only the biggest bottom-up frames
+		// thanks to the sort order. This relies on the tree property
+		// where children are always smaller than their parents.
+		var fudge = 0.0001;	// JavaScript floating point
+		for (var k in keys) {
+			var x = parseFloat(keys[k]);
+			var w = matches[keys[k]];
+			if (x >= lastx + lastw - fudge) {
+				count += w;
+				lastx = x;
+				lastw = w;
+			}
+		}
+		// display matched percent
+		matchedtxt.classList.remove("hide");
+		var pct = 100 * count / maxwidth;
+		if (pct != 100) pct = pct.toFixed(1)
+		matchedtxt.firstChild.nodeValue = "Matched: " + pct + "%";
+	}
+]]>
+</script>
+<rect x="0.0" y="0" width="1200.0" height="1030.0" fill="url(#background)"  />
+<text id="title" x="600.00" y="24" >Flame Graph</text>
+<text id="details" x="10.00" y="1013" > </text>
+<text id="unzoom" x="10.00" y="24" class="hide">Reset Zoom</text>
+<text id="search" x="1090.00" y="24" >Search</text>
+<text id="matched" x="1090.00" y="1013" > </text>
+<g id="frames">
+<g >
+<title>org/apache/ibatis/plugin/Invocation.proceed (1 samples, 2.33%)</title><rect x="1080.2" y="453" width="27.5" height="15.0" fill="rgb(101,247,101)" rx="2" ry="2" />
+<text  x="1083.23" y="463.5" >o..</text>
+</g>
+<g >
+<title>java/lang/String.toLowerCase (1 samples, 2.33%)</title><rect x="1107.7" y="533" width="27.4" height="15.0" fill="rgb(103,249,103)" rx="2" ry="2" />
+<text  x="1110.67" y="543.5" >j..</text>
+</g>
+<g >
+<title>__perf_event_enable (1 samples, 2.33%)</title><rect x="202.1" y="789" width="27.4" height="15.0" fill="rgb(229,129,0)" rx="2" ry="2" />
+<text  x="205.09" y="799.5" >_..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 2.33%)</title><rect x="778.4" y="725" width="27.4" height="15.0" fill="rgb(61,210,61)" rx="2" ry="2" />
+<text  x="781.37" y="735.5" >c..</text>
+</g>
+<g >
+<title>tcp_ioctl (1 samples, 2.33%)</title><rect x="943.0" y="789" width="27.5" height="15.0" fill="rgb(214,114,0)" rx="2" ry="2" />
+<text  x="946.02" y="799.5" >t..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/statement/PreparedStatementHandler.query (2 samples, 4.65%)</title><rect x="1052.8" y="517" width="54.9" height="15.0" fill="rgb(108,253,108)" rx="2" ry="2" />
+<text  x="1055.79" y="527.5" >org/a..</text>
+</g>
+<g >
+<title>sun/nio/ch/SelectorImpl.lockAndDoSelect (1 samples, 2.33%)</title><rect x="257.0" y="933" width="27.4" height="15.0" fill="rgb(60,209,60)" rx="2" ry="2" />
+<text  x="259.98" y="943.5" >s..</text>
+</g>
+<g >
+<title>com/sun/proxy/$Proxy203.commit (1 samples, 2.33%)</title><rect x="888.1" y="901" width="27.5" height="15.0" fill="rgb(61,210,61)" rx="2" ry="2" />
+<text  x="891.14" y="911.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="1080.2" y="229" width="27.5" height="15.0" fill="rgb(64,213,64)" rx="2" ry="2" />
+<text  x="1083.23" y="239.5" >c..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 2.33%)</title><rect x="1135.1" y="213" width="27.5" height="15.0" fill="rgb(201,101,0)" rx="2" ry="2" />
+<text  x="1138.12" y="223.5" >e..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingStatement.close (1 samples, 2.33%)</title><rect x="860.7" y="821" width="27.4" height="15.0" fill="rgb(102,248,102)" rx="2" ry="2" />
+<text  x="863.70" y="831.5" >o..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 2.33%)</title><rect x="888.1" y="693" width="27.5" height="15.0" fill="rgb(52,202,52)" rx="2" ry="2" />
+<text  x="891.14" y="703.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/StatementImpl.getMoreResults (1 samples, 2.33%)</title><rect x="1080.2" y="309" width="27.5" height="15.0" fill="rgb(91,237,91)" rx="2" ry="2" />
+<text  x="1083.23" y="319.5" >c..</text>
+</g>
+<g >
+<title>do_syscall_64 (1 samples, 2.33%)</title><rect x="10.0" y="837" width="27.4" height="15.0" fill="rgb(228,128,0)" rx="2" ry="2" />
+<text  x="13.00" y="847.5" >d..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.&lt;init&gt; (1 samples, 2.33%)</title><rect x="1025.3" y="581" width="27.5" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="1028.35" y="591.5" >c..</text>
+</g>
+<g >
+<title>Java_java_lang_Throwable_fillInStackTrace (1 samples, 2.33%)</title><rect x="1162.6" y="213" width="27.4" height="15.0" fill="rgb(237,104,104)" rx="2" ry="2" />
+<text  x="1165.56" y="223.5" >J..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.retrieveTrigger (1 samples, 2.33%)</title><rect x="750.9" y="869" width="27.5" height="15.0" fill="rgb(109,254,109)" rx="2" ry="2" />
+<text  x="753.93" y="879.5" >o..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.read (1 samples, 2.33%)</title><rect x="805.8" y="645" width="27.5" height="15.0" fill="rgb(50,200,50)" rx="2" ry="2" />
+<text  x="808.81" y="655.5" >c..</text>
+</g>
+<g >
+<title>PerfLongVariant::sample() (1 samples, 2.33%)</title><rect x="119.8" y="901" width="27.4" height="15.0" fill="rgb(187,187,54)" rx="2" ry="2" />
+<text  x="122.77" y="911.5" >P..</text>
+</g>
+<g >
+<title>sun/nio/ch/Net.socket (1 samples, 2.33%)</title><rect x="641.2" y="885" width="27.4" height="15.0" fill="rgb(65,214,65)" rx="2" ry="2" />
+<text  x="644.16" y="895.5" >s..</text>
+</g>
+<g >
+<title>inet_recvmsg (1 samples, 2.33%)</title><rect x="888.1" y="453" width="27.5" height="15.0" fill="rgb(218,118,0)" rx="2" ry="2" />
+<text  x="891.14" y="463.5" >i..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/CachingExecutor.query (5 samples, 11.63%)</title><rect x="1052.8" y="677" width="137.2" height="15.0" fill="rgb(94,240,94)" rx="2" ry="2" />
+<text  x="1055.79" y="687.5" >org/apache/ibatis..</text>
+</g>
+<g >
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer.unparkSuccessor (3 samples, 6.98%)</title><rect x="421.6" y="821" width="82.4" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="424.63" y="831.5" >java/util..</text>
+</g>
+<g >
+<title>org/apache/ibatis/plugin/Plugin.invoke (2 samples, 4.65%)</title><rect x="1052.8" y="597" width="54.9" height="15.0" fill="rgb(83,230,83)" rx="2" ry="2" />
+<text  x="1055.79" y="607.5" >org/a..</text>
+</g>
+<g >
+<title>java/lang/Thread.run (10 samples, 23.26%)</title><rect x="366.7" y="965" width="274.5" height="15.0" fill="rgb(102,248,102)" rx="2" ry="2" />
+<text  x="369.74" y="975.5" >java/lang/Thread.run</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.lambda$resetAppIndexFollow$260 (1 samples, 2.33%)</title><rect x="366.7" y="933" width="27.5" height="15.0" fill="rgb(85,232,85)" rx="2" ry="2" />
+<text  x="369.74" y="943.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.nextRowFast (1 samples, 2.33%)</title><rect x="366.7" y="149" width="27.5" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="369.74" y="159.5" >c..</text>
+</g>
+<g >
+<title>schedule (1 samples, 2.33%)</title><rect x="531.4" y="661" width="27.4" height="15.0" fill="rgb(227,127,0)" rx="2" ry="2" />
+<text  x="534.40" y="671.5" >s..</text>
+</g>
+<g >
+<title>org/apache/commons/pool2/impl/GenericObjectPool.borrowObject (2 samples, 4.65%)</title><rect x="1135.1" y="485" width="54.9" height="15.0" fill="rgb(53,202,53)" rx="2" ry="2" />
+<text  x="1138.12" y="495.5" >org/a..</text>
+</g>
+<g >
+<title>net/rubyeye/xmemcached/impl/MemcachedConnector$SessionMonitor.run (1 samples, 2.33%)</title><rect x="641.2" y="965" width="27.4" height="15.0" fill="rgb(67,216,67)" rx="2" ry="2" />
+<text  x="644.16" y="975.5" >n..</text>
+</g>
+<g >
+<title>do_syscall_64 (1 samples, 2.33%)</title><rect x="1135.1" y="197" width="27.5" height="15.0" fill="rgb(215,115,0)" rx="2" ry="2" />
+<text  x="1138.12" y="207.5" >d..</text>
+</g>
+<g >
+<title>java/util/regex/Matcher.find (1 samples, 2.33%)</title><rect x="1052.8" y="437" width="27.4" height="15.0" fill="rgb(78,225,78)" rx="2" ry="2" />
+<text  x="1055.79" y="447.5" >j..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl$$Lambda$86/1397892041.accept (1 samples, 2.33%)</title><rect x="366.7" y="821" width="27.5" height="15.0" fill="rgb(88,234,88)" rx="2" ry="2" />
+<text  x="369.74" y="831.5" >c..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl$$Lambda$87/110648669.call (1 samples, 2.33%)</title><rect x="366.7" y="757" width="27.5" height="15.0" fill="rgb(58,208,58)" rx="2" ry="2" />
+<text  x="369.74" y="767.5" >c..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/CronTriggerPersistenceDelegate.loadExtendedTriggerProperties (1 samples, 2.33%)</title><rect x="750.9" y="837" width="27.5" height="15.0" fill="rgb(67,215,67)" rx="2" ry="2" />
+<text  x="753.93" y="847.5" >o..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeQuery (1 samples, 2.33%)</title><rect x="750.9" y="805" width="27.5" height="15.0" fill="rgb(58,207,58)" rx="2" ry="2" />
+<text  x="753.93" y="815.5" >o..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.nextRow (1 samples, 2.33%)</title><rect x="366.7" y="165" width="27.5" height="15.0" fill="rgb(65,213,65)" rx="2" ry="2" />
+<text  x="369.74" y="175.5" >c..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/PoolableConnectionFactory.validateObject (2 samples, 4.65%)</title><rect x="1135.1" y="453" width="54.9" height="15.0" fill="rgb(77,224,77)" rx="2" ry="2" />
+<text  x="1138.12" y="463.5" >org/a..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 2.33%)</title><rect x="668.6" y="709" width="27.4" height="15.0" fill="rgb(84,232,84)" rx="2" ry="2" />
+<text  x="671.60" y="719.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.getResultSet (1 samples, 2.33%)</title><rect x="1025.3" y="709" width="27.5" height="15.0" fill="rgb(77,225,77)" rx="2" ry="2" />
+<text  x="1028.35" y="719.5" >c..</text>
+</g>
+<g >
+<title>Java_java_lang_Throwable_fillInStackTrace (1 samples, 2.33%)</title><rect x="1080.2" y="101" width="27.5" height="15.0" fill="rgb(254,128,128)" rx="2" ry="2" />
+<text  x="1083.23" y="111.5" >J..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeQuery (1 samples, 2.33%)</title><rect x="750.9" y="821" width="27.5" height="15.0" fill="rgb(92,239,92)" rx="2" ry="2" />
+<text  x="753.93" y="831.5" >o..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport$40.execute (3 samples, 6.98%)</title><rect x="750.9" y="917" width="82.4" height="15.0" fill="rgb(60,209,60)" rx="2" ry="2" />
+<text  x="753.93" y="927.5" >org/quart..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.checkErrorPacket (1 samples, 2.33%)</title><rect x="778.4" y="741" width="27.4" height="15.0" fill="rgb(51,201,51)" rx="2" ry="2" />
+<text  x="781.37" y="751.5" >c..</text>
+</g>
+<g >
+<title>Monitor::wait(bool, long, bool) (2 samples, 4.65%)</title><rect x="174.7" y="901" width="54.8" height="15.0" fill="rgb(198,198,58)" rx="2" ry="2" />
+<text  x="177.65" y="911.5" >Monit..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingStatement.getMoreResults (1 samples, 2.33%)</title><rect x="1080.2" y="357" width="27.5" height="15.0" fill="rgb(76,223,76)" rx="2" ry="2" />
+<text  x="1083.23" y="367.5" >o..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport$43.execute (2 samples, 4.65%)</title><rect x="833.3" y="917" width="54.8" height="15.0" fill="rgb(101,246,101)" rx="2" ry="2" />
+<text  x="836.26" y="927.5" >org/q..</text>
+</g>
+<g >
+<title>BacktraceBuilder::expand(Thread*) (1 samples, 2.33%)</title><rect x="860.7" y="501" width="27.4" height="15.0" fill="rgb(178,178,51)" rx="2" ry="2" />
+<text  x="863.70" y="511.5" >B..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl$$Lambda$85/1027210548.call (1 samples, 2.33%)</title><rect x="366.7" y="885" width="27.5" height="15.0" fill="rgb(101,247,101)" rx="2" ry="2" />
+<text  x="369.74" y="895.5" >c..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/PoolingDataSource.getConnection (3 samples, 6.98%)</title><rect x="668.6" y="853" width="82.3" height="15.0" fill="rgb(104,250,104)" rx="2" ry="2" />
+<text  x="671.60" y="863.5" >org/apach..</text>
+</g>
+<g >
+<title>sun/reflect/DelegatingConstructorAccessorImpl.newInstance (1 samples, 2.33%)</title><rect x="1025.3" y="629" width="27.5" height="15.0" fill="rgb(58,208,58)" rx="2" ry="2" />
+<text  x="1028.35" y="639.5" >s..</text>
+</g>
+<g >
+<title>com/bilibili/schedule/documentary/task/PublishDocEpisodeTask.executeInternal (5 samples, 11.63%)</title><rect x="1052.8" y="917" width="137.2" height="15.0" fill="rgb(81,228,81)" rx="2" ry="2" />
+<text  x="1055.79" y="927.5" >com/bilibili/sche..</text>
+</g>
+<g >
+<title>java/util/concurrent/locks/ReentrantLock.unlock (3 samples, 6.98%)</title><rect x="558.8" y="869" width="82.4" height="15.0" fill="rgb(100,246,100)" rx="2" ry="2" />
+<text  x="561.84" y="879.5" >java/util..</text>
+</g>
+<g >
+<title>java/lang/Object.wait (3 samples, 6.98%)</title><rect x="284.4" y="933" width="82.3" height="15.0" fill="rgb(61,210,61)" rx="2" ry="2" />
+<text  x="287.42" y="943.5" >java/lang..</text>
+</g>
+<g >
+<title>java/lang/Throwable.fillInStackTrace (1 samples, 2.33%)</title><rect x="860.7" y="597" width="27.4" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="863.70" y="607.5" >j..</text>
+</g>
+<g >
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (1 samples, 2.33%)</title><rect x="1080.2" y="421" width="27.5" height="15.0" fill="rgb(100,246,100)" rx="2" ry="2" />
+<text  x="1083.23" y="431.5" >s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.realClose (1 samples, 2.33%)</title><rect x="860.7" y="741" width="27.4" height="15.0" fill="rgb(77,225,77)" rx="2" ry="2" />
+<text  x="863.70" y="751.5" >c..</text>
+</g>
+<g >
+<title>VMThread::loop() (1 samples, 2.33%)</title><rect x="10.0" y="917" width="27.4" height="15.0" fill="rgb(203,203,60)" rx="2" ry="2" />
+<text  x="13.00" y="927.5" >V..</text>
+</g>
+<g >
+<title>do_futex (1 samples, 2.33%)</title><rect x="504.0" y="725" width="27.4" height="15.0" fill="rgb(193,93,0)" rx="2" ry="2" />
+<text  x="506.95" y="735.5" >d..</text>
+</g>
+<g >
+<title>org/quartz/core/JobRunShell.run (7 samples, 16.28%)</title><rect x="997.9" y="949" width="192.1" height="15.0" fill="rgb(63,212,63)" rx="2" ry="2" />
+<text  x="1000.91" y="959.5" >org/quartz/core/JobRunShe..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.selectTriggerToAcquire (1 samples, 2.33%)</title><rect x="778.4" y="869" width="27.4" height="15.0" fill="rgb(57,206,57)" rx="2" ry="2" />
+<text  x="781.37" y="879.5" >o..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libc-2.19.so (deleted) (1 samples, 2.33%)</title><rect x="257.0" y="869" width="27.4" height="15.0" fill="rgb(249,122,122)" rx="2" ry="2" />
+<text  x="259.98" y="879.5" >/..</text>
+</g>
+<g >
+<title>sun/nio/ch/SelectorProviderImpl.openSocketChannel (1 samples, 2.33%)</title><rect x="641.2" y="917" width="27.4" height="15.0" fill="rgb(93,239,93)" rx="2" ry="2" />
+<text  x="644.16" y="927.5" >s..</text>
+</g>
+<g >
+<title>do_futex (1 samples, 2.33%)</title><rect x="449.1" y="693" width="27.4" height="15.0" fill="rgb(208,108,0)" rx="2" ry="2" />
+<text  x="452.07" y="703.5" >d..</text>
+</g>
+<g >
+<title>do_syscall_64 (1 samples, 2.33%)</title><rect x="943.0" y="869" width="27.5" height="15.0" fill="rgb(228,128,0)" rx="2" ry="2" />
+<text  x="946.02" y="879.5" >d..</text>
+</g>
+<g >
+<title>org/mybatis/spring/SqlSessionTemplate$SqlSessionInterceptor.invoke (5 samples, 11.63%)</title><rect x="1052.8" y="789" width="137.2" height="15.0" fill="rgb(86,233,86)" rx="2" ry="2" />
+<text  x="1055.79" y="799.5" >org/mybatis/sprin..</text>
+</g>
+<g >
+<title>java/lang/Throwable.&lt;init&gt; (1 samples, 2.33%)</title><rect x="1162.6" y="261" width="27.4" height="15.0" fill="rgb(101,247,101)" rx="2" ry="2" />
+<text  x="1165.56" y="271.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/StatementImpl.close (1 samples, 2.33%)</title><rect x="860.7" y="805" width="27.4" height="15.0" fill="rgb(53,202,53)" rx="2" ry="2" />
+<text  x="863.70" y="815.5" >c..</text>
+</g>
+<g >
+<title>do_futex (1 samples, 2.33%)</title><rect x="531.4" y="741" width="27.4" height="15.0" fill="rgb(193,93,0)" rx="2" ry="2" />
+<text  x="534.40" y="751.5" >d..</text>
+</g>
+<g >
+<title>java/net/AbstractPlainSocketImpl.available (1 samples, 2.33%)</title><rect x="668.6" y="629" width="27.4" height="15.0" fill="rgb(77,225,77)" rx="2" ry="2" />
+<text  x="671.60" y="639.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 2.33%)</title><rect x="366.7" y="261" width="27.5" height="15.0" fill="rgb(88,234,88)" rx="2" ry="2" />
+<text  x="369.74" y="271.5" >c..</text>
+</g>
+<g >
+<title>hrtimer_wakeup (1 samples, 2.33%)</title><rect x="202.1" y="757" width="27.4" height="15.0" fill="rgb(223,123,0)" rx="2" ry="2" />
+<text  x="205.09" y="767.5" >h..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (1 samples, 2.33%)</title><rect x="778.4" y="805" width="27.4" height="15.0" fill="rgb(87,234,87)" rx="2" ry="2" />
+<text  x="781.37" y="815.5" >c..</text>
+</g>
+<g >
+<title>org/springframework/scheduling/quartz/QuartzJobBean.execute (5 samples, 11.63%)</title><rect x="1052.8" y="933" width="137.2" height="15.0" fill="rgb(94,240,94)" rx="2" ry="2" />
+<text  x="1055.79" y="943.5" >org/springframewo..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.execute (1 samples, 2.33%)</title><rect x="366.7" y="293" width="27.5" height="15.0" fill="rgb(67,216,67)" rx="2" ry="2" />
+<text  x="369.74" y="303.5" >c..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.read (1 samples, 2.33%)</title><rect x="805.8" y="597" width="27.5" height="15.0" fill="rgb(71,219,71)" rx="2" ry="2" />
+<text  x="808.81" y="607.5" >j..</text>
+</g>
+<g >
+<title>WatcherThread::sleep() const (2 samples, 4.65%)</title><rect x="174.7" y="917" width="54.8" height="15.0" fill="rgb(192,192,56)" rx="2" ry="2" />
+<text  x="177.65" y="927.5" >Watch..</text>
+</g>
+<g >
+<title>com/bilibili/schedule/documentary/service/impl/AllEpisode2TaskServiceImpl.publishAllEpisodeByTime (5 samples, 11.63%)</title><rect x="1052.8" y="901" width="137.2" height="15.0" fill="rgb(83,230,83)" rx="2" ry="2" />
+<text  x="1055.79" y="911.5" >com/bilibili/sche..</text>
+</g>
+<g >
+<title>org/springframework/scheduling/quartz/LocalDataSourceJobStore$2.getConnection (3 samples, 6.98%)</title><rect x="668.6" y="885" width="82.3" height="15.0" fill="rgb(76,224,76)" rx="2" ry="2" />
+<text  x="671.60" y="895.5" >org/sprin..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.read (1 samples, 2.33%)</title><rect x="888.1" y="597" width="27.5" height="15.0" fill="rgb(67,216,67)" rx="2" ry="2" />
+<text  x="891.14" y="607.5" >j..</text>
+</g>
+<g >
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer.fullyRelease (3 samples, 6.98%)</title><rect x="421.6" y="853" width="82.4" height="15.0" fill="rgb(50,200,50)" rx="2" ry="2" />
+<text  x="424.63" y="863.5" >java/util..</text>
+</g>
+<g >
+<title>sun/reflect/GeneratedMethodAccessor47.invoke (1 samples, 2.33%)</title><rect x="1080.2" y="405" width="27.5" height="15.0" fill="rgb(63,212,63)" rx="2" ry="2" />
+<text  x="1083.23" y="415.5" >s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.available (1 samples, 2.33%)</title><rect x="668.6" y="661" width="27.4" height="15.0" fill="rgb(93,240,93)" rx="2" ry="2" />
+<text  x="671.60" y="671.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 2.33%)</title><rect x="750.9" y="741" width="27.5" height="15.0" fill="rgb(58,207,58)" rx="2" ry="2" />
+<text  x="753.93" y="751.5" >c..</text>
+</g>
+<g >
+<title>org/quartz/core/QuartzSchedulerThread.run (9 samples, 20.93%)</title><rect x="668.6" y="965" width="247.0" height="15.0" fill="rgb(54,204,54)" rx="2" ry="2" />
+<text  x="671.60" y="975.5" >org/quartz/core/QuartzSchedulerT..</text>
+</g>
+<g >
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectList (1 samples, 2.33%)</title><rect x="366.7" y="533" width="27.5" height="15.0" fill="rgb(68,216,68)" rx="2" ry="2" />
+<text  x="369.74" y="543.5" >o..</text>
+</g>
+<g >
+<title>java_lang_Throwable::fill_in_stack_trace(Handle, methodHandle) (1 samples, 2.33%)</title><rect x="1080.2" y="69" width="27.5" height="15.0" fill="rgb(224,224,67)" rx="2" ry="2" />
+<text  x="1083.23" y="79.5" >j..</text>
+</g>
+<g >
+<title>java/sql/SQLException.&lt;init&gt; (1 samples, 2.33%)</title><rect x="1162.6" y="293" width="27.4" height="15.0" fill="rgb(76,224,76)" rx="2" ry="2" />
+<text  x="1165.56" y="303.5" >j..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (2 samples, 4.65%)</title><rect x="586.3" y="773" width="54.9" height="15.0" fill="rgb(210,64,64)" rx="2" ry="2" />
+<text  x="589.28" y="783.5" >/lib/..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 2.33%)</title><rect x="943.0" y="885" width="27.5" height="15.0" fill="rgb(192,92,0)" rx="2" ry="2" />
+<text  x="946.02" y="895.5" >e..</text>
+</g>
+<g >
+<title>java/util/concurrent/locks/LockSupport.unpark (3 samples, 6.98%)</title><rect x="421.6" y="805" width="82.4" height="15.0" fill="rgb(56,205,56)" rx="2" ry="2" />
+<text  x="424.63" y="815.5" >java/util..</text>
+</g>
+<g >
+<title>java/util/concurrent/ThreadPoolExecutor.getTask (8 samples, 18.60%)</title><rect x="421.6" y="917" width="219.6" height="15.0" fill="rgb(59,209,59)" rx="2" ry="2" />
+<text  x="424.63" y="927.5" >java/util/concurrent/ThreadPo..</text>
+</g>
+<g >
+<title>org/mybatis/spring/SqlSessionTemplate.selectList (5 samples, 11.63%)</title><rect x="1052.8" y="821" width="137.2" height="15.0" fill="rgb(52,202,52)" rx="2" ry="2" />
+<text  x="1055.79" y="831.5" >org/mybatis/sprin..</text>
+</g>
+<g >
+<title>java/util/concurrent/locks/LockSupport.park (2 samples, 4.65%)</title><rect x="504.0" y="853" width="54.8" height="15.0" fill="rgb(51,201,51)" rx="2" ry="2" />
+<text  x="506.95" y="863.5" >java/..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 2.33%)</title><rect x="1135.1" y="373" width="27.5" height="15.0" fill="rgb(85,232,85)" rx="2" ry="2" />
+<text  x="1138.12" y="383.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="1080.2" y="245" width="27.5" height="15.0" fill="rgb(106,251,106)" rx="2" ry="2" />
+<text  x="1083.23" y="255.5" >c..</text>
+</g>
+<g >
+<title>java/lang/Throwable.getStackTrace (1 samples, 2.33%)</title><rect x="229.5" y="821" width="27.5" height="15.0" fill="rgb(52,201,52)" rx="2" ry="2" />
+<text  x="232.53" y="831.5" >j..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/PoolableConnectionFactory.validateConnection (3 samples, 6.98%)</title><rect x="668.6" y="789" width="82.3" height="15.0" fill="rgb(89,236,89)" rx="2" ry="2" />
+<text  x="671.60" y="799.5" >org/apach..</text>
+</g>
+<g >
+<title>wake_up_q (1 samples, 2.33%)</title><rect x="449.1" y="677" width="27.4" height="15.0" fill="rgb(233,133,0)" rx="2" ry="2" />
+<text  x="452.07" y="687.5" >w..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeQuery (1 samples, 2.33%)</title><rect x="1025.3" y="821" width="27.5" height="15.0" fill="rgb(53,203,53)" rx="2" ry="2" />
+<text  x="1028.35" y="831.5" >o..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingStatement.getMoreResults (1 samples, 2.33%)</title><rect x="1080.2" y="341" width="27.5" height="15.0" fill="rgb(83,230,83)" rx="2" ry="2" />
+<text  x="1083.23" y="351.5" >o..</text>
+</g>
+<g >
+<title>JVM_FillInStackTrace (1 samples, 2.33%)</title><rect x="860.7" y="549" width="27.4" height="15.0" fill="rgb(233,99,99)" rx="2" ry="2" />
+<text  x="863.70" y="559.5" >J..</text>
+</g>
+<g >
+<title>futex_wake (1 samples, 2.33%)</title><rect x="943.0" y="725" width="27.5" height="15.0" fill="rgb(234,134,0)" rx="2" ry="2" />
+<text  x="946.02" y="735.5" >f..</text>
+</g>
+<g >
+<title>com/sun/proxy/$Proxy208.query (2 samples, 4.65%)</title><rect x="1052.8" y="613" width="54.9" height="15.0" fill="rgb(76,224,76)" rx="2" ry="2" />
+<text  x="1055.79" y="623.5" >com/s..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.execute (1 samples, 2.33%)</title><rect x="366.7" y="309" width="27.5" height="15.0" fill="rgb(75,223,75)" rx="2" ry="2" />
+<text  x="369.74" y="319.5" >o..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/BasicDataSource.getConnection (2 samples, 4.65%)</title><rect x="1135.1" y="517" width="54.9" height="15.0" fill="rgb(60,209,60)" rx="2" ry="2" />
+<text  x="1138.12" y="527.5" >org/a..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.clearInputStream (1 samples, 2.33%)</title><rect x="668.6" y="677" width="27.4" height="15.0" fill="rgb(58,207,58)" rx="2" ry="2" />
+<text  x="671.60" y="687.5" >c..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (2 samples, 4.65%)</title><rect x="586.3" y="757" width="54.9" height="15.0" fill="rgb(218,118,0)" rx="2" ry="2" />
+<text  x="589.28" y="767.5" >entry..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (2 samples, 4.65%)</title><rect x="915.6" y="901" width="54.9" height="15.0" fill="rgb(233,98,98)" rx="2" ry="2" />
+<text  x="918.58" y="911.5" >/lib/..</text>
+</g>
+<g >
+<title>futex_wait (1 samples, 2.33%)</title><rect x="202.1" y="741" width="27.4" height="15.0" fill="rgb(203,103,0)" rx="2" ry="2" />
+<text  x="205.09" y="751.5" >f..</text>
+</g>
+<g >
+<title>com/google/code/yanf4j/nio/impl/Reactor.dispatchEvent (1 samples, 2.33%)</title><rect x="229.5" y="949" width="27.5" height="15.0" fill="rgb(64,213,64)" rx="2" ry="2" />
+<text  x="232.53" y="959.5" >c..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 2.33%)</title><rect x="888.1" y="549" width="27.5" height="15.0" fill="rgb(202,53,53)" rx="2" ry="2" />
+<text  x="891.14" y="559.5" >/..</text>
+</g>
+<g >
+<title>java_lang_Throwable::fill_in_stack_trace(Handle, methodHandle, Thread*) (1 samples, 2.33%)</title><rect x="1162.6" y="165" width="27.4" height="15.0" fill="rgb(211,211,63)" rx="2" ry="2" />
+<text  x="1165.56" y="175.5" >j..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.retryExecuteInNonManagedTXLock (1 samples, 2.33%)</title><rect x="1025.3" y="901" width="27.5" height="15.0" fill="rgb(94,240,94)" rx="2" ry="2" />
+<text  x="1028.35" y="911.5" >o..</text>
+</g>
+<g >
+<title>finish_task_switch (1 samples, 2.33%)</title><rect x="257.0" y="693" width="27.4" height="15.0" fill="rgb(250,150,0)" rx="2" ry="2" />
+<text  x="259.98" y="703.5" >f..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/PoolableConnection.validate (3 samples, 6.98%)</title><rect x="668.6" y="773" width="82.3" height="15.0" fill="rgb(70,218,70)" rx="2" ry="2" />
+<text  x="671.60" y="783.5" >org/apach..</text>
+</g>
+<g >
+<title>schedule (1 samples, 2.33%)</title><rect x="504.0" y="757" width="27.4" height="15.0" fill="rgb(218,118,0)" rx="2" ry="2" />
+<text  x="506.95" y="767.5" >s..</text>
+</g>
+<g >
+<title>java/util/Arrays.copyOfRange (1 samples, 2.33%)</title><rect x="997.9" y="901" width="27.4" height="15.0" fill="rgb(73,221,73)" rx="2" ry="2" />
+<text  x="1000.91" y="911.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (1 samples, 2.33%)</title><rect x="668.6" y="741" width="27.4" height="15.0" fill="rgb(72,220,72)" rx="2" ry="2" />
+<text  x="671.60" y="751.5" >c..</text>
+</g>
+<g >
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer.release (3 samples, 6.98%)</title><rect x="558.8" y="853" width="82.4" height="15.0" fill="rgb(50,200,50)" rx="2" ry="2" />
+<text  x="561.84" y="863.5" >java/util..</text>
+</g>
+<g >
+<title>java/util/regex/Pattern$Start.match (1 samples, 2.33%)</title><rect x="1052.8" y="405" width="27.4" height="15.0" fill="rgb(63,211,63)" rx="2" ry="2" />
+<text  x="1055.79" y="415.5" >j..</text>
+</g>
+<g >
+<title>Java_java_lang_Throwable_fillInStackTrace (1 samples, 2.33%)</title><rect x="860.7" y="565" width="27.4" height="15.0" fill="rgb(227,90,90)" rx="2" ry="2" />
+<text  x="863.70" y="575.5" >J..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.fill (1 samples, 2.33%)</title><rect x="778.4" y="645" width="27.4" height="15.0" fill="rgb(65,213,65)" rx="2" ry="2" />
+<text  x="781.37" y="655.5" >c..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.socketRead0 (1 samples, 2.33%)</title><rect x="888.1" y="565" width="27.5" height="15.0" fill="rgb(97,243,97)" rx="2" ry="2" />
+<text  x="891.14" y="575.5" >j..</text>
+</g>
+<g >
+<title>sun/nio/ch/EPollArrayWrapper.poll (1 samples, 2.33%)</title><rect x="257.0" y="901" width="27.4" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="259.98" y="911.5" >s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.getResultSet (1 samples, 2.33%)</title><rect x="750.9" y="693" width="27.5" height="15.0" fill="rgb(79,226,79)" rx="2" ry="2" />
+<text  x="753.93" y="703.5" >c..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/SimpleExecutor.doQuery (1 samples, 2.33%)</title><rect x="366.7" y="453" width="27.5" height="15.0" fill="rgb(99,245,99)" rx="2" ry="2" />
+<text  x="369.74" y="463.5" >o..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libc-2.19.so (deleted) (1 samples, 2.33%)</title><rect x="1135.1" y="229" width="27.5" height="15.0" fill="rgb(240,109,109)" rx="2" ry="2" />
+<text  x="1138.12" y="239.5" >/..</text>
+</g>
+<g >
+<title>try_to_wake_up (1 samples, 2.33%)</title><rect x="449.1" y="645" width="27.4" height="15.0" fill="rgb(200,100,0)" rx="2" ry="2" />
+<text  x="452.07" y="655.5" >t..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.readAllResults (1 samples, 2.33%)</title><rect x="750.9" y="725" width="27.5" height="15.0" fill="rgb(66,215,66)" rx="2" ry="2" />
+<text  x="753.93" y="735.5" >c..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/statement/PreparedStatementHandler.query (1 samples, 2.33%)</title><rect x="366.7" y="341" width="27.5" height="15.0" fill="rgb(64,213,64)" rx="2" ry="2" />
+<text  x="369.74" y="351.5" >o..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.available (1 samples, 2.33%)</title><rect x="668.6" y="645" width="27.4" height="15.0" fill="rgb(77,225,77)" rx="2" ry="2" />
+<text  x="671.60" y="655.5" >j..</text>
+</g>
+<g >
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectOne (1 samples, 2.33%)</title><rect x="366.7" y="565" width="27.5" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="369.74" y="575.5" >o..</text>
+</g>
+<g >
+<title>org/springframework/jdbc/datasource/DataSourceUtils.doGetConnection (2 samples, 4.65%)</title><rect x="1135.1" y="533" width="54.9" height="15.0" fill="rgb(107,252,107)" rx="2" ry="2" />
+<text  x="1138.12" y="543.5" >org/s..</text>
+</g>
+<g >
+<title>com/sun/proxy/$Proxy208.query (1 samples, 2.33%)</title><rect x="366.7" y="437" width="27.5" height="15.0" fill="rgb(94,240,94)" rx="2" ry="2" />
+<text  x="369.74" y="447.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.checkClosed (1 samples, 2.33%)</title><rect x="1162.6" y="373" width="27.4" height="15.0" fill="rgb(91,238,91)" rx="2" ry="2" />
+<text  x="1165.56" y="383.5" >c..</text>
+</g>
+<g >
+<title>sys_epoll_wait (1 samples, 2.33%)</title><rect x="257.0" y="821" width="27.4" height="15.0" fill="rgb(197,97,0)" rx="2" ry="2" />
+<text  x="259.98" y="831.5" >s..</text>
+</g>
+<g >
+<title>org/apache/ibatis/plugin/Plugin.invoke (1 samples, 2.33%)</title><rect x="366.7" y="421" width="27.5" height="15.0" fill="rgb(79,227,79)" rx="2" ry="2" />
+<text  x="369.74" y="431.5" >o..</text>
+</g>
+<g >
+<title>JVM_FillInStackTrace (1 samples, 2.33%)</title><rect x="1080.2" y="85" width="27.5" height="15.0" fill="rgb(239,107,107)" rx="2" ry="2" />
+<text  x="1083.23" y="95.5" >J..</text>
+</g>
+<g >
+<title>java/lang/Exception.&lt;init&gt; (1 samples, 2.33%)</title><rect x="1162.6" y="277" width="27.4" height="15.0" fill="rgb(108,253,108)" rx="2" ry="2" />
+<text  x="1165.56" y="287.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/StatementImpl.removeOpenResultSet (1 samples, 2.33%)</title><rect x="723.5" y="725" width="27.4" height="15.0" fill="rgb(59,208,59)" rx="2" ry="2" />
+<text  x="726.49" y="735.5" >c..</text>
+</g>
+<g >
+<title>sun/misc/Unsafe.unpark (3 samples, 6.98%)</title><rect x="421.6" y="789" width="82.4" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="424.63" y="799.5" >sun/misc/..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.readFully (1 samples, 2.33%)</title><rect x="778.4" y="693" width="27.4" height="15.0" fill="rgb(81,229,81)" rx="2" ry="2" />
+<text  x="781.37" y="703.5" >c..</text>
+</g>
+<g >
+<title>sun/misc/Unsafe.unpark (2 samples, 4.65%)</title><rect x="586.3" y="805" width="54.9" height="15.0" fill="rgb(70,218,70)" rx="2" ry="2" />
+<text  x="589.28" y="815.5" >sun/m..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.commitConnection (1 samples, 2.33%)</title><rect x="888.1" y="917" width="27.5" height="15.0" fill="rgb(53,203,53)" rx="2" ry="2" />
+<text  x="891.14" y="927.5" >o..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingConnection.commit (1 samples, 2.33%)</title><rect x="888.1" y="821" width="27.5" height="15.0" fill="rgb(59,208,59)" rx="2" ry="2" />
+<text  x="891.14" y="831.5" >o..</text>
+</g>
+<g >
+<title>inet_recvmsg (1 samples, 2.33%)</title><rect x="943.0" y="757" width="27.5" height="15.0" fill="rgb(222,122,0)" rx="2" ry="2" />
+<text  x="946.02" y="767.5" >i..</text>
+</g>
+<g >
+<title>java/lang/Exception.&lt;init&gt; (1 samples, 2.33%)</title><rect x="860.7" y="629" width="27.4" height="15.0" fill="rgb(74,222,74)" rx="2" ry="2" />
+<text  x="863.70" y="639.5" >j..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.executeInNonManagedTXLock (3 samples, 6.98%)</title><rect x="833.3" y="933" width="82.3" height="15.0" fill="rgb(60,209,60)" rx="2" ry="2" />
+<text  x="836.26" y="943.5" >org/quart..</text>
+</g>
+<g >
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectList (5 samples, 11.63%)</title><rect x="1052.8" y="709" width="137.2" height="15.0" fill="rgb(75,223,75)" rx="2" ry="2" />
+<text  x="1055.79" y="719.5" >org/apache/ibatis..</text>
+</g>
+<g >
+<title>java/lang/Exception.&lt;init&gt; (1 samples, 2.33%)</title><rect x="1080.2" y="165" width="27.5" height="15.0" fill="rgb(61,210,61)" rx="2" ry="2" />
+<text  x="1083.23" y="175.5" >j..</text>
+</g>
+<g >
+<title>futex_wake (1 samples, 2.33%)</title><rect x="613.7" y="677" width="27.5" height="15.0" fill="rgb(208,108,0)" rx="2" ry="2" />
+<text  x="616.72" y="687.5" >f..</text>
+</g>
+<g >
+<title>sun/nio/ch/IOUtil.newFD (1 samples, 2.33%)</title><rect x="641.2" y="853" width="27.4" height="15.0" fill="rgb(83,230,83)" rx="2" ry="2" />
+<text  x="644.16" y="863.5" >s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.realClose (1 samples, 2.33%)</title><rect x="696.0" y="741" width="27.5" height="15.0" fill="rgb(56,205,56)" rx="2" ry="2" />
+<text  x="699.05" y="751.5" >c..</text>
+</g>
+<g >
+<title>org/quartz/core/QuartzScheduler.notifyJobStoreJobComplete (1 samples, 2.33%)</title><rect x="1025.3" y="933" width="27.5" height="15.0" fill="rgb(74,222,74)" rx="2" ry="2" />
+<text  x="1028.35" y="943.5" >o..</text>
+</g>
+<g >
+<title>do_vfs_ioctl (1 samples, 2.33%)</title><rect x="943.0" y="837" width="27.5" height="15.0" fill="rgb(206,106,0)" rx="2" ry="2" />
+<text  x="946.02" y="847.5" >d..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingStatement.close (1 samples, 2.33%)</title><rect x="860.7" y="837" width="27.4" height="15.0" fill="rgb(96,242,96)" rx="2" ry="2" />
+<text  x="863.70" y="847.5" >o..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.selectTriggerState (2 samples, 4.65%)</title><rect x="833.3" y="869" width="54.8" height="15.0" fill="rgb(52,201,52)" rx="2" ry="2" />
+<text  x="836.26" y="879.5" >org/q..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="860.7" y="693" width="27.4" height="15.0" fill="rgb(62,211,62)" rx="2" ry="2" />
+<text  x="863.70" y="703.5" >c..</text>
+</g>
+<g >
+<title>sun/nio/ch/Net.socket (1 samples, 2.33%)</title><rect x="641.2" y="869" width="27.4" height="15.0" fill="rgb(108,253,108)" rx="2" ry="2" />
+<text  x="644.16" y="879.5" >s..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/AttributeRestoringConnectionInvocationHandler.invoke (1 samples, 2.33%)</title><rect x="888.1" y="885" width="27.5" height="15.0" fill="rgb(99,245,99)" rx="2" ry="2" />
+<text  x="891.14" y="895.5" >o..</text>
+</g>
+<g >
+<title>wake_up_q (1 samples, 2.33%)</title><rect x="586.3" y="677" width="27.4" height="15.0" fill="rgb(192,92,0)" rx="2" ry="2" />
+<text  x="589.28" y="687.5" >w..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/StdRowLockSemaphore.executeSQL (1 samples, 2.33%)</title><rect x="1025.3" y="853" width="27.5" height="15.0" fill="rgb(85,232,85)" rx="2" ry="2" />
+<text  x="1028.35" y="863.5" >o..</text>
+</g>
+<g >
+<title>__perf_event_enable (1 samples, 2.33%)</title><rect x="586.3" y="709" width="27.4" height="15.0" fill="rgb(225,125,0)" rx="2" ry="2" />
+<text  x="589.28" y="719.5" >_..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (1 samples, 2.33%)</title><rect x="805.8" y="773" width="27.5" height="15.0" fill="rgb(107,252,107)" rx="2" ry="2" />
+<text  x="808.81" y="783.5" >c..</text>
+</g>
+<g >
+<title>get_futex_value_locked (1 samples, 2.33%)</title><rect x="202.1" y="693" width="27.4" height="15.0" fill="rgb(199,99,0)" rx="2" ry="2" />
+<text  x="205.09" y="703.5" >g..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/CachingExecutor.query (1 samples, 2.33%)</title><rect x="366.7" y="517" width="27.5" height="15.0" fill="rgb(83,230,83)" rx="2" ry="2" />
+<text  x="369.74" y="527.5" >o..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/common/dao/interceptor/PaginationInterceptor.intercept (2 samples, 4.65%)</title><rect x="1052.8" y="469" width="54.9" height="15.0" fill="rgb(92,239,92)" rx="2" ry="2" />
+<text  x="1055.79" y="479.5" >com/b..</text>
+</g>
+<g >
+<title>java/sql/SQLException.&lt;init&gt; (1 samples, 2.33%)</title><rect x="860.7" y="645" width="27.4" height="15.0" fill="rgb(56,206,56)" rx="2" ry="2" />
+<text  x="863.70" y="655.5" >j..</text>
+</g>
+<g >
+<title>java/lang/reflect/Method.invoke (2 samples, 4.65%)</title><rect x="1052.8" y="581" width="54.9" height="15.0" fill="rgb(107,252,107)" rx="2" ry="2" />
+<text  x="1055.79" y="591.5" >java/..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/JDBC4ResultSet.&lt;init&gt; (1 samples, 2.33%)</title><rect x="1025.3" y="597" width="27.5" height="15.0" fill="rgb(78,225,78)" rx="2" ry="2" />
+<text  x="1028.35" y="607.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="696.0" y="693" width="27.5" height="15.0" fill="rgb(81,228,81)" rx="2" ry="2" />
+<text  x="699.05" y="703.5" >c..</text>
+</g>
+<g >
+<title>java/lang/Throwable.fillInStackTrace (1 samples, 2.33%)</title><rect x="1080.2" y="117" width="27.5" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="1083.23" y="127.5" >j..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/PoolableConnectionFactory.validateConnection (2 samples, 4.65%)</title><rect x="1135.1" y="437" width="54.9" height="15.0" fill="rgb(60,209,60)" rx="2" ry="2" />
+<text  x="1138.12" y="447.5" >org/a..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="860.7" y="677" width="27.4" height="15.0" fill="rgb(81,229,81)" rx="2" ry="2" />
+<text  x="863.70" y="687.5" >c..</text>
+</g>
+<g >
+<title>java/util/HashSet.remove (1 samples, 2.33%)</title><rect x="723.5" y="709" width="27.4" height="15.0" fill="rgb(61,210,61)" rx="2" ry="2" />
+<text  x="726.49" y="719.5" >j..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.triggerFired (2 samples, 4.65%)</title><rect x="833.3" y="885" width="54.8" height="15.0" fill="rgb(68,216,68)" rx="2" ry="2" />
+<text  x="836.26" y="895.5" >org/q..</text>
+</g>
+<g >
+<title>java/lang/reflect/Method.invoke (1 samples, 2.33%)</title><rect x="366.7" y="613" width="27.5" height="15.0" fill="rgb(75,223,75)" rx="2" ry="2" />
+<text  x="369.74" y="623.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.fill (1 samples, 2.33%)</title><rect x="805.8" y="613" width="27.5" height="15.0" fill="rgb(100,246,100)" rx="2" ry="2" />
+<text  x="808.81" y="623.5" >c..</text>
+</g>
+<g >
+<title>Unsafe_Unpark (2 samples, 4.65%)</title><rect x="586.3" y="789" width="54.9" height="15.0" fill="rgb(245,115,115)" rx="2" ry="2" />
+<text  x="589.28" y="799.5" >Unsaf..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.readFully (1 samples, 2.33%)</title><rect x="805.8" y="661" width="27.5" height="15.0" fill="rgb(60,209,60)" rx="2" ry="2" />
+<text  x="808.81" y="671.5" >c..</text>
+</g>
+<g >
+<title>org/apache/ibatis/binding/MapperMethod.executeForMany (5 samples, 11.63%)</title><rect x="1052.8" y="837" width="137.2" height="15.0" fill="rgb(81,228,81)" rx="2" ry="2" />
+<text  x="1055.79" y="847.5" >org/apache/ibatis..</text>
+</g>
+<g >
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer.unparkSuccessor (3 samples, 6.98%)</title><rect x="558.8" y="837" width="82.4" height="15.0" fill="rgb(88,235,88)" rx="2" ry="2" />
+<text  x="561.84" y="847.5" >java/util..</text>
+</g>
+<g >
+<title>Monitor::IWait(Thread*, long) (2 samples, 4.65%)</title><rect x="174.7" y="885" width="54.8" height="15.0" fill="rgb(190,190,55)" rx="2" ry="2" />
+<text  x="177.65" y="895.5" >Monit..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.readResultsForQueryOrUpdate (1 samples, 2.33%)</title><rect x="366.7" y="213" width="27.5" height="15.0" fill="rgb(59,208,59)" rx="2" ry="2" />
+<text  x="369.74" y="223.5" >c..</text>
+</g>
+<g >
+<title>org/quartz/utils/DBConnectionManager.getConnection (3 samples, 6.98%)</title><rect x="668.6" y="901" width="82.3" height="15.0" fill="rgb(52,201,52)" rx="2" ry="2" />
+<text  x="671.60" y="911.5" >org/quart..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (1 samples, 2.33%)</title><rect x="1025.3" y="789" width="27.5" height="15.0" fill="rgb(71,219,71)" rx="2" ry="2" />
+<text  x="1028.35" y="799.5" >c..</text>
+</g>
+<g >
+<title>_raw_spin_unlock_irqrestore (1 samples, 2.33%)</title><rect x="586.3" y="629" width="27.4" height="15.0" fill="rgb(213,113,0)" rx="2" ry="2" />
+<text  x="589.28" y="639.5" >_..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="1080.2" y="197" width="27.5" height="15.0" fill="rgb(86,233,86)" rx="2" ry="2" />
+<text  x="1083.23" y="207.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 2.33%)</title><rect x="366.7" y="245" width="27.5" height="15.0" fill="rgb(85,232,85)" rx="2" ry="2" />
+<text  x="369.74" y="255.5" >c..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/SimpleExecutor.doQuery (5 samples, 11.63%)</title><rect x="1052.8" y="629" width="137.2" height="15.0" fill="rgb(87,234,87)" rx="2" ry="2" />
+<text  x="1055.79" y="639.5" >org/apache/ibatis..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 2.33%)</title><rect x="805.8" y="757" width="27.5" height="15.0" fill="rgb(67,215,67)" rx="2" ry="2" />
+<text  x="808.81" y="767.5" >c..</text>
+</g>
+<g >
+<title>java/net/PlainSocketImpl.socketAvailable (1 samples, 2.33%)</title><rect x="668.6" y="613" width="27.4" height="15.0" fill="rgb(76,224,76)" rx="2" ry="2" />
+<text  x="671.60" y="623.5" >j..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/statement/RoutingStatementHandler.query (2 samples, 4.65%)</title><rect x="1052.8" y="533" width="54.9" height="15.0" fill="rgb(50,200,50)" rx="2" ry="2" />
+<text  x="1055.79" y="543.5" >org/a..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="1162.6" y="325" width="27.4" height="15.0" fill="rgb(78,225,78)" rx="2" ry="2" />
+<text  x="1165.56" y="335.5" >c..</text>
+</g>
+<g >
+<title>java_start(Thread*) (8 samples, 18.60%)</title><rect x="10.0" y="949" width="219.5" height="15.0" fill="rgb(220,80,80)" rx="2" ry="2" />
+<text  x="13.00" y="959.5" >java_start(Thread*)</text>
+</g>
+<g >
+<title>tcp_v4_do_rcv (1 samples, 2.33%)</title><rect x="888.1" y="389" width="27.5" height="15.0" fill="rgb(227,127,0)" rx="2" ry="2" />
+<text  x="891.14" y="399.5" >t..</text>
+</g>
+<g >
+<title>org/springframework/jdbc/datasource/DataSourceUtils.getConnection (2 samples, 4.65%)</title><rect x="1135.1" y="549" width="54.9" height="15.0" fill="rgb(94,240,94)" rx="2" ry="2" />
+<text  x="1138.12" y="559.5" >org/s..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/statement/RoutingStatementHandler.query (1 samples, 2.33%)</title><rect x="366.7" y="357" width="27.5" height="15.0" fill="rgb(94,241,94)" rx="2" ry="2" />
+<text  x="369.74" y="367.5" >o..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingConnection.commit (1 samples, 2.33%)</title><rect x="888.1" y="805" width="27.5" height="15.0" fill="rgb(50,200,50)" rx="2" ry="2" />
+<text  x="891.14" y="815.5" >o..</text>
+</g>
+<g >
+<title>Unsafe_Unpark (3 samples, 6.98%)</title><rect x="421.6" y="773" width="82.4" height="15.0" fill="rgb(225,87,87)" rx="2" ry="2" />
+<text  x="424.63" y="783.5" >Unsafe_Un..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.read (1 samples, 2.33%)</title><rect x="778.4" y="677" width="27.4" height="15.0" fill="rgb(51,201,51)" rx="2" ry="2" />
+<text  x="781.37" y="687.5" >c..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libc-2.19.so (deleted) (1 samples, 2.33%)</title><rect x="668.6" y="581" width="27.4" height="15.0" fill="rgb(218,76,76)" rx="2" ry="2" />
+<text  x="671.60" y="591.5" >/..</text>
+</g>
+<g >
+<title>do_futex (1 samples, 2.33%)</title><rect x="421.6" y="677" width="27.5" height="15.0" fill="rgb(194,94,0)" rx="2" ry="2" />
+<text  x="424.63" y="687.5" >d..</text>
+</g>
+<g >
+<title>java/net/PlainSocketImpl.socketAvailable (1 samples, 2.33%)</title><rect x="1135.1" y="261" width="27.5" height="15.0" fill="rgb(100,246,100)" rx="2" ry="2" />
+<text  x="1138.12" y="271.5" >j..</text>
+</g>
+<g >
+<title>sun/nio/ch/SelectorImpl.select (1 samples, 2.33%)</title><rect x="257.0" y="949" width="27.4" height="15.0" fill="rgb(56,206,56)" rx="2" ry="2" />
+<text  x="259.98" y="959.5" >s..</text>
+</g>
+<g >
+<title>com/sun/proxy/$Proxy184.getEpisodeIdsByTime (5 samples, 11.63%)</title><rect x="1052.8" y="885" width="137.2" height="15.0" fill="rgb(80,227,80)" rx="2" ry="2" />
+<text  x="1055.79" y="895.5" >com/sun/proxy/$Pr..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.updateTriggerStateFromOtherState (1 samples, 2.33%)</title><rect x="805.8" y="869" width="27.5" height="15.0" fill="rgb(51,201,51)" rx="2" ry="2" />
+<text  x="808.81" y="879.5" >o..</text>
+</g>
+<g >
+<title>sys_ioctl (1 samples, 2.33%)</title><rect x="888.1" y="501" width="27.5" height="15.0" fill="rgb(194,94,0)" rx="2" ry="2" />
+<text  x="891.14" y="511.5" >s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.getInstance (1 samples, 2.33%)</title><rect x="1025.3" y="677" width="27.5" height="15.0" fill="rgb(83,231,83)" rx="2" ry="2" />
+<text  x="1028.35" y="687.5" >c..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeQuery (1 samples, 2.33%)</title><rect x="778.4" y="837" width="27.4" height="15.0" fill="rgb(90,237,90)" rx="2" ry="2" />
+<text  x="781.37" y="847.5" >o..</text>
+</g>
+<g >
+<title>sys_futex (1 samples, 2.33%)</title><rect x="531.4" y="757" width="27.4" height="15.0" fill="rgb(254,154,0)" rx="2" ry="2" />
+<text  x="534.40" y="767.5" >s..</text>
+</g>
+<g >
+<title>java/util/concurrent/ThreadPoolExecutor$Worker.run (9 samples, 20.93%)</title><rect x="394.2" y="949" width="247.0" height="15.0" fill="rgb(95,242,95)" rx="2" ry="2" />
+<text  x="397.19" y="959.5" >java/util/concurrent/ThreadPoolE..</text>
+</g>
+<g >
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (5 samples, 11.63%)</title><rect x="1052.8" y="757" width="137.2" height="15.0" fill="rgb(66,215,66)" rx="2" ry="2" />
+<text  x="1055.79" y="767.5" >sun/reflect/Deleg..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.available (1 samples, 2.33%)</title><rect x="1135.1" y="309" width="27.5" height="15.0" fill="rgb(94,241,94)" rx="2" ry="2" />
+<text  x="1138.12" y="319.5" >c..</text>
+</g>
+<g >
+<title>CompactibleFreeListSpace::used() const (1 samples, 2.33%)</title><rect x="147.2" y="869" width="27.5" height="15.0" fill="rgb(214,214,64)" rx="2" ry="2" />
+<text  x="150.21" y="879.5" >C..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 2.33%)</title><rect x="202.1" y="853" width="27.4" height="15.0" fill="rgb(231,131,0)" rx="2" ry="2" />
+<text  x="205.09" y="863.5" >e..</text>
+</g>
+<g >
+<title>tcp_rcv_established (1 samples, 2.33%)</title><rect x="888.1" y="373" width="27.5" height="15.0" fill="rgb(232,132,0)" rx="2" ry="2" />
+<text  x="891.14" y="383.5" >t..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 2.33%)</title><rect x="10.0" y="853" width="27.4" height="15.0" fill="rgb(234,134,0)" rx="2" ry="2" />
+<text  x="13.00" y="863.5" >e..</text>
+</g>
+<g >
+<title>sun/reflect/GeneratedConstructorAccessor45.newInstance (1 samples, 2.33%)</title><rect x="1025.3" y="613" width="27.5" height="15.0" fill="rgb(73,221,73)" rx="2" ry="2" />
+<text  x="1028.35" y="623.5" >s..</text>
+</g>
+<g >
+<title>org/mybatis/spring/transaction/SpringManagedTransaction.openConnection (2 samples, 4.65%)</title><rect x="1135.1" y="565" width="54.9" height="15.0" fill="rgb(72,220,72)" rx="2" ry="2" />
+<text  x="1138.12" y="575.5" >org/m..</text>
+</g>
+<g >
+<title>java/lang/reflect/Constructor.newInstance (1 samples, 2.33%)</title><rect x="1025.3" y="645" width="27.5" height="15.0" fill="rgb(90,237,90)" rx="2" ry="2" />
+<text  x="1028.35" y="655.5" >j..</text>
+</g>
+<g >
+<title>sock_do_ioctl (1 samples, 2.33%)</title><rect x="943.0" y="805" width="27.5" height="15.0" fill="rgb(193,93,0)" rx="2" ry="2" />
+<text  x="946.02" y="815.5" >s..</text>
+</g>
+<g >
+<title>java/util/concurrent/ThreadPoolExecutor.runWorker (9 samples, 20.93%)</title><rect x="394.2" y="933" width="247.0" height="15.0" fill="rgb(96,243,96)" rx="2" ry="2" />
+<text  x="397.19" y="943.5" >java/util/concurrent/ThreadPoolE..</text>
+</g>
+<g >
+<title>java/lang/reflect/Method.invoke (1 samples, 2.33%)</title><rect x="1080.2" y="437" width="27.5" height="15.0" fill="rgb(69,217,69)" rx="2" ry="2" />
+<text  x="1083.23" y="447.5" >j..</text>
+</g>
+<g >
+<title>org/apache/commons/pool2/impl/GenericObjectPool.borrowObject (2 samples, 4.65%)</title><rect x="1135.1" y="469" width="54.9" height="15.0" fill="rgb(106,251,106)" rx="2" ry="2" />
+<text  x="1138.12" y="479.5" >org/a..</text>
+</g>
+<g >
+<title>do_futex (1 samples, 2.33%)</title><rect x="586.3" y="693" width="27.4" height="15.0" fill="rgb(218,118,0)" rx="2" ry="2" />
+<text  x="589.28" y="703.5" >d..</text>
+</g>
+<g >
+<title>java/lang/reflect/Method.invoke (5 samples, 11.63%)</title><rect x="1052.8" y="773" width="137.2" height="15.0" fill="rgb(103,249,103)" rx="2" ry="2" />
+<text  x="1055.79" y="783.5" >java/lang/reflect..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.lambda$null$265 (1 samples, 2.33%)</title><rect x="366.7" y="805" width="27.5" height="15.0" fill="rgb(103,249,103)" rx="2" ry="2" />
+<text  x="369.74" y="815.5" >c..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.execute (1 samples, 2.33%)</title><rect x="366.7" y="325" width="27.5" height="15.0" fill="rgb(109,254,109)" rx="2" ry="2" />
+<text  x="369.74" y="335.5" >o..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 2.33%)</title><rect x="805.8" y="677" width="27.5" height="15.0" fill="rgb(72,220,72)" rx="2" ry="2" />
+<text  x="808.81" y="687.5" >c..</text>
+</g>
+<g >
+<title>default_wake_function (1 samples, 2.33%)</title><rect x="257.0" y="805" width="27.4" height="15.0" fill="rgb(216,116,0)" rx="2" ry="2" />
+<text  x="259.98" y="815.5" >d..</text>
+</g>
+<g >
+<title>Thread::SpinAcquire(int volatile*, char const*) (1 samples, 2.33%)</title><rect x="970.5" y="901" width="27.4" height="15.0" fill="rgb(189,189,55)" rx="2" ry="2" />
+<text  x="973.47" y="911.5" >T..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.executeInNonManagedTXLock (6 samples, 13.95%)</title><rect x="668.6" y="933" width="164.7" height="15.0" fill="rgb(87,234,87)" rx="2" ry="2" />
+<text  x="671.60" y="943.5" >org/quartz/impl/jdbcj..</text>
+</g>
+<g >
+<title>futex_wake (1 samples, 2.33%)</title><rect x="586.3" y="661" width="27.4" height="15.0" fill="rgb(214,114,0)" rx="2" ry="2" />
+<text  x="589.28" y="671.5" >f..</text>
+</g>
+<g >
+<title>jni_SetIntField (1 samples, 2.33%)</title><rect x="641.2" y="821" width="27.4" height="15.0" fill="rgb(228,90,90)" rx="2" ry="2" />
+<text  x="644.16" y="831.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="860.7" y="661" width="27.4" height="15.0" fill="rgb(79,227,79)" rx="2" ry="2" />
+<text  x="863.70" y="671.5" >c..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.getAppSeasonBeanInList (1 samples, 2.33%)</title><rect x="366.7" y="789" width="27.5" height="15.0" fill="rgb(51,201,51)" rx="2" ry="2" />
+<text  x="369.74" y="799.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeQuery (2 samples, 4.65%)</title><rect x="1135.1" y="405" width="54.9" height="15.0" fill="rgb(70,218,70)" rx="2" ry="2" />
+<text  x="1138.12" y="415.5" >com/m..</text>
+</g>
+<g >
+<title>__schedule (1 samples, 2.33%)</title><rect x="531.4" y="645" width="27.4" height="15.0" fill="rgb(235,135,0)" rx="2" ry="2" />
+<text  x="534.40" y="655.5" >_..</text>
+</g>
+<g >
+<title>com/sun/proxy/$Proxy207.handleResultSets (2 samples, 4.65%)</title><rect x="1052.8" y="501" width="54.9" height="15.0" fill="rgb(77,224,77)" rx="2" ry="2" />
+<text  x="1055.79" y="511.5" >com/s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.realClose (1 samples, 2.33%)</title><rect x="1080.2" y="277" width="27.5" height="15.0" fill="rgb(91,238,91)" rx="2" ry="2" />
+<text  x="1083.23" y="287.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="696.0" y="677" width="27.5" height="15.0" fill="rgb(59,208,59)" rx="2" ry="2" />
+<text  x="699.05" y="687.5" >c..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/CachingExecutor.query (1 samples, 2.33%)</title><rect x="366.7" y="501" width="27.5" height="15.0" fill="rgb(53,203,53)" rx="2" ry="2" />
+<text  x="369.74" y="511.5" >o..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 2.33%)</title><rect x="805.8" y="741" width="27.5" height="15.0" fill="rgb(63,212,63)" rx="2" ry="2" />
+<text  x="808.81" y="751.5" >c..</text>
+</g>
+<g >
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (2 samples, 4.65%)</title><rect x="1052.8" y="565" width="54.9" height="15.0" fill="rgb(79,227,79)" rx="2" ry="2" />
+<text  x="1055.79" y="575.5" >sun/r..</text>
+</g>
+<g >
+<title>futex_wait_setup (1 samples, 2.33%)</title><rect x="202.1" y="709" width="27.4" height="15.0" fill="rgb(251,151,0)" rx="2" ry="2" />
+<text  x="205.09" y="719.5" >f..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.socketRead (1 samples, 2.33%)</title><rect x="805.8" y="565" width="27.5" height="15.0" fill="rgb(65,214,65)" rx="2" ry="2" />
+<text  x="808.81" y="575.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/Util.handleNewInstance (1 samples, 2.33%)</title><rect x="1025.3" y="661" width="27.5" height="15.0" fill="rgb(63,212,63)" rx="2" ry="2" />
+<text  x="1028.35" y="671.5" >c..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport$43.execute (2 samples, 4.65%)</title><rect x="833.3" y="901" width="54.8" height="15.0" fill="rgb(56,205,56)" rx="2" ry="2" />
+<text  x="836.26" y="911.5" >org/q..</text>
+</g>
+<g >
+<title>sys_futex (1 samples, 2.33%)</title><rect x="888.1" y="485" width="27.5" height="15.0" fill="rgb(249,149,0)" rx="2" ry="2" />
+<text  x="891.14" y="495.5" >s..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.read (1 samples, 2.33%)</title><rect x="778.4" y="629" width="27.4" height="15.0" fill="rgb(78,226,78)" rx="2" ry="2" />
+<text  x="781.37" y="639.5" >j..</text>
+</g>
+<g >
+<title>java/util/regex/Pattern$BmpCharProperty.match (1 samples, 2.33%)</title><rect x="1052.8" y="389" width="27.4" height="15.0" fill="rgb(54,204,54)" rx="2" ry="2" />
+<text  x="1055.79" y="399.5" >j..</text>
+</g>
+<g >
+<title>PeriodicTask::real_time_tick(int) (3 samples, 6.98%)</title><rect x="92.3" y="917" width="82.4" height="15.0" fill="rgb(201,201,59)" rx="2" ry="2" />
+<text  x="95.33" y="927.5" >PeriodicT..</text>
+</g>
+<g >
+<title>sys_futex (1 samples, 2.33%)</title><rect x="421.6" y="693" width="27.5" height="15.0" fill="rgb(227,127,0)" rx="2" ry="2" />
+<text  x="424.63" y="703.5" >s..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (2 samples, 4.65%)</title><rect x="504.0" y="805" width="54.8" height="15.0" fill="rgb(205,58,58)" rx="2" ry="2" />
+<text  x="506.95" y="815.5" >/lib/..</text>
+</g>
+<g >
+<title>do_syscall_64 (2 samples, 4.65%)</title><rect x="504.0" y="773" width="54.8" height="15.0" fill="rgb(246,146,0)" rx="2" ry="2" />
+<text  x="506.95" y="783.5" >do_sy..</text>
+</g>
+<g >
+<title>sys_futex (1 samples, 2.33%)</title><rect x="339.3" y="837" width="27.4" height="15.0" fill="rgb(224,124,0)" rx="2" ry="2" />
+<text  x="342.30" y="847.5" >s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeQuery (1 samples, 2.33%)</title><rect x="750.9" y="789" width="27.5" height="15.0" fill="rgb(93,239,93)" rx="2" ry="2" />
+<text  x="753.93" y="799.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="696.0" y="709" width="27.5" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="699.05" y="719.5" >c..</text>
+</g>
+<g >
+<title>sys_futex (1 samples, 2.33%)</title><rect x="449.1" y="709" width="27.4" height="15.0" fill="rgb(217,117,0)" rx="2" ry="2" />
+<text  x="452.07" y="719.5" >s..</text>
+</g>
+<g >
+<title>org/apache/commons/pool2/impl/GenericObjectPool.borrowObject (3 samples, 6.98%)</title><rect x="668.6" y="821" width="82.3" height="15.0" fill="rgb(96,242,96)" rx="2" ry="2" />
+<text  x="671.60" y="831.5" >org/apach..</text>
+</g>
+<g >
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectList (1 samples, 2.33%)</title><rect x="366.7" y="549" width="27.5" height="15.0" fill="rgb(84,232,84)" rx="2" ry="2" />
+<text  x="369.74" y="559.5" >o..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.socketRead (1 samples, 2.33%)</title><rect x="888.1" y="581" width="27.5" height="15.0" fill="rgb(93,240,93)" rx="2" ry="2" />
+<text  x="891.14" y="591.5" >j..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.setString (1 samples, 2.33%)</title><rect x="833.3" y="853" width="27.4" height="15.0" fill="rgb(99,245,99)" rx="2" ry="2" />
+<text  x="836.26" y="863.5" >o..</text>
+</g>
+<g >
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (1 samples, 2.33%)</title><rect x="366.7" y="389" width="27.5" height="15.0" fill="rgb(86,233,86)" rx="2" ry="2" />
+<text  x="369.74" y="399.5" >s..</text>
+</g>
+<g >
+<title>org/apache/ibatis/binding/MapperProxy.invoke (1 samples, 2.33%)</title><rect x="366.7" y="693" width="27.5" height="15.0" fill="rgb(75,223,75)" rx="2" ry="2" />
+<text  x="369.74" y="703.5" >o..</text>
+</g>
+<g >
+<title>org/apache/ibatis/binding/MapperProxy.invoke (5 samples, 11.63%)</title><rect x="1052.8" y="869" width="137.2" height="15.0" fill="rgb(64,213,64)" rx="2" ry="2" />
+<text  x="1055.79" y="879.5" >org/apache/ibatis..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/BaseExecutor.queryFromDatabase (5 samples, 11.63%)</title><rect x="1052.8" y="645" width="137.2" height="15.0" fill="rgb(79,227,79)" rx="2" ry="2" />
+<text  x="1055.79" y="655.5" >org/apache/ibatis..</text>
+</g>
+<g >
+<title>do_futex (1 samples, 2.33%)</title><rect x="943.0" y="741" width="27.5" height="15.0" fill="rgb(248,148,0)" rx="2" ry="2" />
+<text  x="946.02" y="751.5" >d..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 2.33%)</title><rect x="668.6" y="565" width="27.4" height="15.0" fill="rgb(252,152,0)" rx="2" ry="2" />
+<text  x="671.60" y="575.5" >e..</text>
+</g>
+<g >
+<title>tcp_ack (1 samples, 2.33%)</title><rect x="888.1" y="357" width="27.5" height="15.0" fill="rgb(207,107,0)" rx="2" ry="2" />
+<text  x="891.14" y="367.5" >t..</text>
+</g>
+<g >
+<title>schedule (1 samples, 2.33%)</title><rect x="421.6" y="709" width="27.5" height="15.0" fill="rgb(228,128,0)" rx="2" ry="2" />
+<text  x="424.63" y="719.5" >s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 2.33%)</title><rect x="888.1" y="757" width="27.5" height="15.0" fill="rgb(93,239,93)" rx="2" ry="2" />
+<text  x="891.14" y="767.5" >c..</text>
+</g>
+<g >
+<title>do_syscall_64 (2 samples, 4.65%)</title><rect x="586.3" y="741" width="54.9" height="15.0" fill="rgb(228,128,0)" rx="2" ry="2" />
+<text  x="589.28" y="751.5" >do_sy..</text>
+</g>
+<g >
+<title>futex_wake (1 samples, 2.33%)</title><rect x="504.0" y="709" width="27.4" height="15.0" fill="rgb(213,113,0)" rx="2" ry="2" />
+<text  x="506.95" y="719.5" >f..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 2.33%)</title><rect x="257.0" y="853" width="27.4" height="15.0" fill="rgb(219,119,0)" rx="2" ry="2" />
+<text  x="259.98" y="863.5" >e..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="1080.2" y="213" width="27.5" height="15.0" fill="rgb(86,233,86)" rx="2" ry="2" />
+<text  x="1083.23" y="223.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeQuery (1 samples, 2.33%)</title><rect x="1025.3" y="805" width="27.5" height="15.0" fill="rgb(86,233,86)" rx="2" ry="2" />
+<text  x="1028.35" y="815.5" >c..</text>
+</g>
+<g >
+<title>schedule (1 samples, 2.33%)</title><rect x="257.0" y="741" width="27.4" height="15.0" fill="rgb(199,99,0)" rx="2" ry="2" />
+<text  x="259.98" y="751.5" >s..</text>
+</g>
+<g >
+<title>ch/qos/logback/classic/Logger.filterAndLog_0_Or3Plus (1 samples, 2.33%)</title><rect x="229.5" y="885" width="27.5" height="15.0" fill="rgb(208,63,63)" rx="2" ry="2" />
+<text  x="232.53" y="895.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeUpdate (1 samples, 2.33%)</title><rect x="805.8" y="789" width="27.5" height="15.0" fill="rgb(51,201,51)" rx="2" ry="2" />
+<text  x="808.81" y="799.5" >c..</text>
+</g>
+<g >
+<title>java/util/ArrayList$ArrayListSpliterator.forEachRemaining (1 samples, 2.33%)</title><rect x="366.7" y="837" width="27.5" height="15.0" fill="rgb(78,225,78)" rx="2" ry="2" />
+<text  x="369.74" y="847.5" >j..</text>
+</g>
+<g >
+<title>wake_up_q (1 samples, 2.33%)</title><rect x="613.7" y="693" width="27.5" height="15.0" fill="rgb(246,146,0)" rx="2" ry="2" />
+<text  x="616.72" y="703.5" >w..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeQuery (2 samples, 4.65%)</title><rect x="668.6" y="757" width="54.9" height="15.0" fill="rgb(70,219,70)" rx="2" ry="2" />
+<text  x="671.60" y="767.5" >com/m..</text>
+</g>
+<g >
+<title>com/sun/proxy/$Proxy69.getSeason2Info (1 samples, 2.33%)</title><rect x="366.7" y="709" width="27.5" height="15.0" fill="rgb(62,211,62)" rx="2" ry="2" />
+<text  x="369.74" y="719.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.readResultsForQueryOrUpdate (1 samples, 2.33%)</title><rect x="1025.3" y="725" width="27.5" height="15.0" fill="rgb(56,206,56)" rx="2" ry="2" />
+<text  x="1028.35" y="735.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/AbandonedConnectionCleanupThread.run (3 samples, 6.98%)</title><rect x="284.4" y="965" width="82.3" height="15.0" fill="rgb(71,219,71)" rx="2" ry="2" />
+<text  x="287.42" y="975.5" >com/mysql..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 2.33%)</title><rect x="778.4" y="549" width="27.4" height="15.0" fill="rgb(225,125,0)" rx="2" ry="2" />
+<text  x="781.37" y="559.5" >e..</text>
+</g>
+<g >
+<title>java/lang/reflect/Method.invoke (1 samples, 2.33%)</title><rect x="366.7" y="405" width="27.5" height="15.0" fill="rgb(102,247,102)" rx="2" ry="2" />
+<text  x="369.74" y="415.5" >j..</text>
+</g>
+<g >
+<title>ch/qos/logback/classic/Logger.error (1 samples, 2.33%)</title><rect x="229.5" y="901" width="27.5" height="15.0" fill="rgb(249,122,122)" rx="2" ry="2" />
+<text  x="232.53" y="911.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="1162.6" y="341" width="27.4" height="15.0" fill="rgb(103,249,103)" rx="2" ry="2" />
+<text  x="1165.56" y="351.5" >c..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.acquireNextTriggers (6 samples, 13.95%)</title><rect x="668.6" y="949" width="164.7" height="15.0" fill="rgb(82,229,82)" rx="2" ry="2" />
+<text  x="671.60" y="959.5" >org/quartz/impl/jdbcj..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.acquireNextTrigger (3 samples, 6.98%)</title><rect x="750.9" y="885" width="82.4" height="15.0" fill="rgb(108,254,108)" rx="2" ry="2" />
+<text  x="753.93" y="895.5" >org/quart..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.closeStatement (1 samples, 2.33%)</title><rect x="860.7" y="853" width="27.4" height="15.0" fill="rgb(97,243,97)" rx="2" ry="2" />
+<text  x="863.70" y="863.5" >o..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/BaseExecutor.queryFromDatabase (1 samples, 2.33%)</title><rect x="366.7" y="469" width="27.5" height="15.0" fill="rgb(80,228,80)" rx="2" ry="2" />
+<text  x="369.74" y="479.5" >o..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/SimpleExecutor.prepareStatement (3 samples, 6.98%)</title><rect x="1107.7" y="613" width="82.3" height="15.0" fill="rgb(70,218,70)" rx="2" ry="2" />
+<text  x="1110.67" y="623.5" >org/apach..</text>
+</g>
+<g >
+<title>BacktraceBuilder::push(Method*, int, Thread*) (1 samples, 2.33%)</title><rect x="1162.6" y="149" width="27.4" height="15.0" fill="rgb(228,228,69)" rx="2" ry="2" />
+<text  x="1165.56" y="159.5" >B..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/PoolableConnection.validate (2 samples, 4.65%)</title><rect x="1135.1" y="421" width="54.9" height="15.0" fill="rgb(51,201,51)" rx="2" ry="2" />
+<text  x="1138.12" y="431.5" >org/a..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/PoolableConnectionFactory.validateObject (3 samples, 6.98%)</title><rect x="668.6" y="805" width="82.3" height="15.0" fill="rgb(83,230,83)" rx="2" ry="2" />
+<text  x="671.60" y="815.5" >org/apach..</text>
+</g>
+<g >
+<title>sun/nio/ch/SocketChannelImpl.&lt;init&gt; (1 samples, 2.33%)</title><rect x="641.2" y="901" width="27.4" height="15.0" fill="rgb(88,234,88)" rx="2" ry="2" />
+<text  x="644.16" y="911.5" >s..</text>
+</g>
+<g >
+<title>sys_futex (1 samples, 2.33%)</title><rect x="10.0" y="821" width="27.4" height="15.0" fill="rgb(208,108,0)" rx="2" ry="2" />
+<text  x="13.00" y="831.5" >s..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/PoolingDataSource.getConnection (2 samples, 4.65%)</title><rect x="1135.1" y="501" width="54.9" height="15.0" fill="rgb(59,208,59)" rx="2" ry="2" />
+<text  x="1138.12" y="511.5" >org/a..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.readFully (1 samples, 2.33%)</title><rect x="888.1" y="677" width="27.5" height="15.0" fill="rgb(62,211,62)" rx="2" ry="2" />
+<text  x="891.14" y="687.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.checkClosed (1 samples, 2.33%)</title><rect x="696.0" y="725" width="27.5" height="15.0" fill="rgb(81,228,81)" rx="2" ry="2" />
+<text  x="699.05" y="735.5" >c..</text>
+</g>
+<g >
+<title>java_lang_Throwable::fill_in_stack_trace(Handle, methodHandle) (1 samples, 2.33%)</title><rect x="860.7" y="533" width="27.4" height="15.0" fill="rgb(177,177,50)" rx="2" ry="2" />
+<text  x="863.70" y="543.5" >j..</text>
+</g>
+<g >
+<title>java/util/concurrent/locks/LockSupport.unpark (3 samples, 6.98%)</title><rect x="558.8" y="821" width="82.4" height="15.0" fill="rgb(97,243,97)" rx="2" ry="2" />
+<text  x="561.84" y="831.5" >java/util..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.setString (1 samples, 2.33%)</title><rect x="833.3" y="837" width="27.4" height="15.0" fill="rgb(104,249,104)" rx="2" ry="2" />
+<text  x="836.26" y="847.5" >o..</text>
+</g>
+<g >
+<title>java/lang/Throwable.fillInStackTrace (1 samples, 2.33%)</title><rect x="1162.6" y="245" width="27.4" height="15.0" fill="rgb(70,218,70)" rx="2" ry="2" />
+<text  x="1165.56" y="255.5" >j..</text>
+</g>
+<g >
+<title>do_syscall_64 (1 samples, 2.33%)</title><rect x="257.0" y="837" width="27.4" height="15.0" fill="rgb(225,125,0)" rx="2" ry="2" />
+<text  x="259.98" y="847.5" >d..</text>
+</g>
+<g >
+<title>sun/reflect/GeneratedMethodAccessor46.invoke (1 samples, 2.33%)</title><rect x="366.7" y="373" width="27.5" height="15.0" fill="rgb(90,237,90)" rx="2" ry="2" />
+<text  x="369.74" y="383.5" >s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.realClose (1 samples, 2.33%)</title><rect x="860.7" y="789" width="27.4" height="15.0" fill="rgb(74,222,74)" rx="2" ry="2" />
+<text  x="863.70" y="799.5" >c..</text>
+</g>
+<g >
+<title>schedule_hrtimeout_range_clock (1 samples, 2.33%)</title><rect x="257.0" y="757" width="27.4" height="15.0" fill="rgb(209,109,0)" rx="2" ry="2" />
+<text  x="259.98" y="767.5" >s..</text>
+</g>
+<g >
+<title>ObjArrayKlass::allocate(int, Thread*) (1 samples, 2.33%)</title><rect x="860.7" y="485" width="27.4" height="15.0" fill="rgb(212,212,63)" rx="2" ry="2" />
+<text  x="863.70" y="495.5" >O..</text>
+</g>
+<g >
+<title>do_futex (1 samples, 2.33%)</title><rect x="613.7" y="709" width="27.5" height="15.0" fill="rgb(229,129,0)" rx="2" ry="2" />
+<text  x="616.72" y="719.5" >d..</text>
+</g>
+<g >
+<title>handle_mm_fault (1 samples, 2.33%)</title><rect x="202.1" y="805" width="27.4" height="15.0" fill="rgb(238,138,0)" rx="2" ry="2" />
+<text  x="205.09" y="815.5" >h..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeUpdate (1 samples, 2.33%)</title><rect x="805.8" y="837" width="27.5" height="15.0" fill="rgb(85,232,85)" rx="2" ry="2" />
+<text  x="808.81" y="847.5" >o..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.read (1 samples, 2.33%)</title><rect x="888.1" y="661" width="27.5" height="15.0" fill="rgb(50,200,50)" rx="2" ry="2" />
+<text  x="891.14" y="671.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.close (1 samples, 2.33%)</title><rect x="1080.2" y="293" width="27.5" height="15.0" fill="rgb(63,212,63)" rx="2" ry="2" />
+<text  x="1083.23" y="303.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.readSingleRowSet (1 samples, 2.33%)</title><rect x="366.7" y="181" width="27.5" height="15.0" fill="rgb(54,204,54)" rx="2" ry="2" />
+<text  x="369.74" y="191.5" >c..</text>
+</g>
+<g >
+<title>__schedule (1 samples, 2.33%)</title><rect x="257.0" y="709" width="27.4" height="15.0" fill="rgb(223,123,0)" rx="2" ry="2" />
+<text  x="259.98" y="719.5" >_..</text>
+</g>
+<g >
+<title>com/sun/proxy/$Proxy48.selectList (5 samples, 11.63%)</title><rect x="1052.8" y="805" width="137.2" height="15.0" fill="rgb(99,245,99)" rx="2" ry="2" />
+<text  x="1055.79" y="815.5" >com/sun/proxy/$Pr..</text>
+</g>
+<g >
+<title>ch/qos/logback/classic/spi/LoggingEvent.&lt;init&gt; (1 samples, 2.33%)</title><rect x="229.5" y="853" width="27.5" height="15.0" fill="rgb(229,92,92)" rx="2" ry="2" />
+<text  x="232.53" y="863.5" >c..</text>
+</g>
+<g >
+<title>java/lang/Throwable.&lt;init&gt; (1 samples, 2.33%)</title><rect x="1080.2" y="149" width="27.5" height="15.0" fill="rgb(59,208,59)" rx="2" ry="2" />
+<text  x="1083.23" y="159.5" >j..</text>
+</g>
+<g >
+<title>java/lang/Throwable.fillInStackTrace (1 samples, 2.33%)</title><rect x="1162.6" y="229" width="27.4" height="15.0" fill="rgb(79,227,79)" rx="2" ry="2" />
+<text  x="1165.56" y="239.5" >j..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (3 samples, 6.98%)</title><rect x="284.4" y="885" width="82.3" height="15.0" fill="rgb(205,57,57)" rx="2" ry="2" />
+<text  x="287.42" y="895.5" >/lib/x86_..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.read (1 samples, 2.33%)</title><rect x="778.4" y="613" width="27.4" height="15.0" fill="rgb(101,247,101)" rx="2" ry="2" />
+<text  x="781.37" y="623.5" >j..</text>
+</g>
+<g >
+<title>JVM_MonitorWait (3 samples, 6.98%)</title><rect x="284.4" y="917" width="82.3" height="15.0" fill="rgb(216,74,74)" rx="2" ry="2" />
+<text  x="287.42" y="927.5" >JVM_Monit..</text>
+</g>
+<g >
+<title>JVM_MonitorWait (3 samples, 6.98%)</title><rect x="915.6" y="933" width="82.3" height="15.0" fill="rgb(215,72,72)" rx="2" ry="2" />
+<text  x="918.58" y="943.5" >JVM_Monit..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl$$Lambda$84/715763457.run (1 samples, 2.33%)</title><rect x="366.7" y="949" width="27.5" height="15.0" fill="rgb(69,217,69)" rx="2" ry="2" />
+<text  x="369.74" y="959.5" >c..</text>
+</g>
+<g >
+<title>Parker::unpark() (1 samples, 2.33%)</title><rect x="476.5" y="757" width="27.5" height="15.0" fill="rgb(200,200,59)" rx="2" ry="2" />
+<text  x="479.51" y="767.5" >P..</text>
+</g>
+<g >
+<title>ObjectMonitor::wait(long, bool, Thread*) (3 samples, 6.98%)</title><rect x="915.6" y="917" width="82.3" height="15.0" fill="rgb(185,185,53)" rx="2" ry="2" />
+<text  x="918.58" y="927.5" >ObjectMon..</text>
+</g>
+<g >
+<title>do_syscall_64 (1 samples, 2.33%)</title><rect x="888.1" y="517" width="27.5" height="15.0" fill="rgb(223,123,0)" rx="2" ry="2" />
+<text  x="891.14" y="527.5" >d..</text>
+</g>
+<g >
+<title>sun/misc/Unsafe.park (2 samples, 4.65%)</title><rect x="504.0" y="837" width="54.8" height="15.0" fill="rgb(90,237,90)" rx="2" ry="2" />
+<text  x="506.95" y="847.5" >sun/m..</text>
+</g>
+<g >
+<title>org/apache/ibatis/session/defaults/DefaultSqlSession.selectList (5 samples, 11.63%)</title><rect x="1052.8" y="725" width="137.2" height="15.0" fill="rgb(69,218,69)" rx="2" ry="2" />
+<text  x="1055.79" y="735.5" >org/apache/ibatis..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/common/mao/BaseMao.set (1 samples, 2.33%)</title><rect x="366.7" y="901" width="27.5" height="15.0" fill="rgb(87,234,87)" rx="2" ry="2" />
+<text  x="369.74" y="911.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 2.33%)</title><rect x="778.4" y="773" width="27.4" height="15.0" fill="rgb(96,242,96)" rx="2" ry="2" />
+<text  x="781.37" y="783.5" >c..</text>
+</g>
+<g >
+<title>Java_java_net_PlainSocketImpl_socketAvailable (1 samples, 2.33%)</title><rect x="1135.1" y="245" width="27.5" height="15.0" fill="rgb(200,50,50)" rx="2" ry="2" />
+<text  x="1138.12" y="255.5" >J..</text>
+</g>
+<g >
+<title>sched_clock (1 samples, 2.33%)</title><rect x="531.4" y="709" width="27.4" height="15.0" fill="rgb(252,152,0)" rx="2" ry="2" />
+<text  x="534.40" y="719.5" >s..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 2.33%)</title><rect x="10.0" y="869" width="27.4" height="15.0" fill="rgb(227,89,89)" rx="2" ry="2" />
+<text  x="13.00" y="879.5" >/..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (1 samples, 2.33%)</title><rect x="750.9" y="773" width="27.5" height="15.0" fill="rgb(63,212,63)" rx="2" ry="2" />
+<text  x="753.93" y="783.5" >c..</text>
+</g>
+<g >
+<title>do_syscall_64 (1 samples, 2.33%)</title><rect x="668.6" y="549" width="27.4" height="15.0" fill="rgb(208,108,0)" rx="2" ry="2" />
+<text  x="671.60" y="559.5" >d..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/DBSemaphore.obtainLock (1 samples, 2.33%)</title><rect x="1025.3" y="869" width="27.5" height="15.0" fill="rgb(65,214,65)" rx="2" ry="2" />
+<text  x="1028.35" y="879.5" >o..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/common/mao/BaseMao.get (1 samples, 2.33%)</title><rect x="366.7" y="773" width="27.5" height="15.0" fill="rgb(82,230,82)" rx="2" ry="2" />
+<text  x="369.74" y="783.5" >c..</text>
+</g>
+<g >
+<title>tcp_prequeue_process (1 samples, 2.33%)</title><rect x="888.1" y="405" width="27.5" height="15.0" fill="rgb(211,111,0)" rx="2" ry="2" />
+<text  x="891.14" y="415.5" >t..</text>
+</g>
+<g >
+<title>org/mybatis/spring/transaction/SpringManagedTransaction.getConnection (2 samples, 4.65%)</title><rect x="1135.1" y="581" width="54.9" height="15.0" fill="rgb(59,208,59)" rx="2" ry="2" />
+<text  x="1138.12" y="591.5" >org/m..</text>
+</g>
+<g >
+<title>java/util/stream/ReferencePipeline$Head.forEach (1 samples, 2.33%)</title><rect x="366.7" y="853" width="27.5" height="15.0" fill="rgb(68,216,68)" rx="2" ry="2" />
+<text  x="369.74" y="863.5" >j..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.socketRead0 (1 samples, 2.33%)</title><rect x="805.8" y="549" width="27.5" height="15.0" fill="rgb(106,251,106)" rx="2" ry="2" />
+<text  x="808.81" y="559.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 2.33%)</title><rect x="1025.3" y="773" width="27.5" height="15.0" fill="rgb(65,214,65)" rx="2" ry="2" />
+<text  x="1028.35" y="783.5" >c..</text>
+</g>
+<g >
+<title>futex_wake (1 samples, 2.33%)</title><rect x="339.3" y="805" width="27.4" height="15.0" fill="rgb(205,105,0)" rx="2" ry="2" />
+<text  x="342.30" y="815.5" >f..</text>
+</g>
+<g >
+<title>java/util/HashMap.remove (1 samples, 2.33%)</title><rect x="723.5" y="693" width="27.4" height="15.0" fill="rgb(88,235,88)" rx="2" ry="2" />
+<text  x="726.49" y="703.5" >j..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.lambda$reloadFollowNewestSerialize$267 (1 samples, 2.33%)</title><rect x="366.7" y="869" width="27.5" height="15.0" fill="rgb(103,248,103)" rx="2" ry="2" />
+<text  x="369.74" y="879.5" >c..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeQuery (1 samples, 2.33%)</title><rect x="778.4" y="853" width="27.4" height="15.0" fill="rgb(109,254,109)" rx="2" ry="2" />
+<text  x="781.37" y="863.5" >o..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeQuery (1 samples, 2.33%)</title><rect x="778.4" y="821" width="27.4" height="15.0" fill="rgb(103,249,103)" rx="2" ry="2" />
+<text  x="781.37" y="831.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sendCommand (1 samples, 2.33%)</title><rect x="888.1" y="741" width="27.5" height="15.0" fill="rgb(74,222,74)" rx="2" ry="2" />
+<text  x="891.14" y="751.5" >c..</text>
+</g>
+<g >
+<title>sun/reflect/GeneratedMethodAccessor46.invoke (2 samples, 4.65%)</title><rect x="1052.8" y="549" width="54.9" height="15.0" fill="rgb(64,213,64)" rx="2" ry="2" />
+<text  x="1055.79" y="559.5" >sun/r..</text>
+</g>
+<g >
+<title>java/nio/channels/SocketChannel.open (1 samples, 2.33%)</title><rect x="641.2" y="933" width="27.4" height="15.0" fill="rgb(71,219,71)" rx="2" ry="2" />
+<text  x="644.16" y="943.5" >j..</text>
+</g>
+<g >
+<title>java/lang/Throwable.getStackTraceElement (1 samples, 2.33%)</title><rect x="229.5" y="805" width="27.5" height="15.0" fill="rgb(65,214,65)" rx="2" ry="2" />
+<text  x="232.53" y="815.5" >j..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/BasicDataSource.getConnection (3 samples, 6.98%)</title><rect x="668.6" y="869" width="82.3" height="15.0" fill="rgb(93,239,93)" rx="2" ry="2" />
+<text  x="671.60" y="879.5" >org/apach..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (2 samples, 4.65%)</title><rect x="421.6" y="741" width="54.9" height="15.0" fill="rgb(190,90,0)" rx="2" ry="2" />
+<text  x="424.63" y="751.5" >entry..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.readFromUnderlyingStreamIfNecessary (1 samples, 2.33%)</title><rect x="888.1" y="645" width="27.5" height="15.0" fill="rgb(66,214,66)" rx="2" ry="2" />
+<text  x="891.14" y="655.5" >c..</text>
+</g>
+<g >
+<title>sun/nio/ch/EPollSelectorImpl.doSelect (1 samples, 2.33%)</title><rect x="257.0" y="917" width="27.4" height="15.0" fill="rgb(59,208,59)" rx="2" ry="2" />
+<text  x="259.98" y="927.5" >s..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (2 samples, 4.65%)</title><rect x="421.6" y="757" width="54.9" height="15.0" fill="rgb(210,65,65)" rx="2" ry="2" />
+<text  x="424.63" y="767.5" >/lib/..</text>
+</g>
+<g >
+<title>sun/nio/ch/IOUtil.setfdVal (1 samples, 2.33%)</title><rect x="641.2" y="837" width="27.4" height="15.0" fill="rgb(86,233,86)" rx="2" ry="2" />
+<text  x="644.16" y="847.5" >s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.read (1 samples, 2.33%)</title><rect x="366.7" y="133" width="27.5" height="15.0" fill="rgb(59,208,59)" rx="2" ry="2" />
+<text  x="369.74" y="143.5" >c..</text>
+</g>
+<g >
+<title>get_futex_key (1 samples, 2.33%)</title><rect x="531.4" y="725" width="27.4" height="15.0" fill="rgb(248,148,0)" rx="2" ry="2" />
+<text  x="534.40" y="735.5" >g..</text>
+</g>
+<g >
+<title>do_syscall_64 (2 samples, 4.65%)</title><rect x="421.6" y="725" width="54.9" height="15.0" fill="rgb(230,130,0)" rx="2" ry="2" />
+<text  x="424.63" y="735.5" >do_sy..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.checkClosed (1 samples, 2.33%)</title><rect x="1080.2" y="261" width="27.5" height="15.0" fill="rgb(94,241,94)" rx="2" ry="2" />
+<text  x="1083.23" y="271.5" >c..</text>
+</g>
+<g >
+<title>org/apache/ibatis/plugin/Plugin.invoke (2 samples, 4.65%)</title><rect x="1052.8" y="485" width="54.9" height="15.0" fill="rgb(63,211,63)" rx="2" ry="2" />
+<text  x="1055.79" y="495.5" >org/a..</text>
+</g>
+<g >
+<title>tcp_sendmsg (1 samples, 2.33%)</title><rect x="888.1" y="437" width="27.5" height="15.0" fill="rgb(218,118,0)" rx="2" ry="2" />
+<text  x="891.14" y="447.5" >t..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/common/dao/interceptor/PaginationInterceptor.needSetResultToPage (1 samples, 2.33%)</title><rect x="1052.8" y="453" width="27.4" height="15.0" fill="rgb(57,206,57)" rx="2" ry="2" />
+<text  x="1055.79" y="463.5" >c..</text>
+</g>
+<g >
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer.release (3 samples, 6.98%)</title><rect x="421.6" y="837" width="82.4" height="15.0" fill="rgb(107,253,107)" rx="2" ry="2" />
+<text  x="424.63" y="847.5" >java/util..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/Buffer.readFieldLength (1 samples, 2.33%)</title><rect x="750.9" y="645" width="27.5" height="15.0" fill="rgb(63,212,63)" rx="2" ry="2" />
+<text  x="753.93" y="655.5" >c..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/BaseExecutor.query (1 samples, 2.33%)</title><rect x="366.7" y="485" width="27.5" height="15.0" fill="rgb(99,245,99)" rx="2" ry="2" />
+<text  x="369.74" y="495.5" >o..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport$40.execute (3 samples, 6.98%)</title><rect x="750.9" y="901" width="82.4" height="15.0" fill="rgb(68,216,68)" rx="2" ry="2" />
+<text  x="753.93" y="911.5" >org/quart..</text>
+</g>
+<g >
+<title>hrtimer_wakeup (1 samples, 2.33%)</title><rect x="257.0" y="773" width="27.4" height="15.0" fill="rgb(249,149,0)" rx="2" ry="2" />
+<text  x="259.98" y="783.5" >h..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (1 samples, 2.33%)</title><rect x="366.7" y="277" width="27.5" height="15.0" fill="rgb(55,205,55)" rx="2" ry="2" />
+<text  x="369.74" y="287.5" >c..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.socketRead0 (1 samples, 2.33%)</title><rect x="778.4" y="581" width="27.4" height="15.0" fill="rgb(108,254,108)" rx="2" ry="2" />
+<text  x="781.37" y="591.5" >j..</text>
+</g>
+<g >
+<title>Unsafe_Park (2 samples, 4.65%)</title><rect x="504.0" y="821" width="54.8" height="15.0" fill="rgb(210,65,65)" rx="2" ry="2" />
+<text  x="506.95" y="831.5" >Unsaf..</text>
+</g>
+<g >
+<title>java_lang_Throwable::fill_in_stack_trace(Handle, methodHandle, Thread*) (1 samples, 2.33%)</title><rect x="1080.2" y="53" width="27.5" height="15.0" fill="rgb(185,185,53)" rx="2" ry="2" />
+<text  x="1083.23" y="63.5" >j..</text>
+</g>
+<g >
+<title>hrtimer_try_to_cancel (1 samples, 2.33%)</title><rect x="202.1" y="725" width="27.4" height="15.0" fill="rgb(232,132,0)" rx="2" ry="2" />
+<text  x="205.09" y="735.5" >h..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.getResultSet (1 samples, 2.33%)</title><rect x="366.7" y="197" width="27.5" height="15.0" fill="rgb(65,213,65)" rx="2" ry="2" />
+<text  x="369.74" y="207.5" >c..</text>
+</g>
+<g >
+<title>sys_futex (1 samples, 2.33%)</title><rect x="504.0" y="741" width="27.4" height="15.0" fill="rgb(244,144,0)" rx="2" ry="2" />
+<text  x="506.95" y="751.5" >s..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/core/season/dao/impl/SeasonV2DaoImpl.getAppSeasonInfoInList (1 samples, 2.33%)</title><rect x="366.7" y="725" width="27.5" height="15.0" fill="rgb(71,219,71)" rx="2" ry="2" />
+<text  x="369.74" y="735.5" >c..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/StdJDBCDelegate.selectTrigger (1 samples, 2.33%)</title><rect x="750.9" y="853" width="27.5" height="15.0" fill="rgb(81,228,81)" rx="2" ry="2" />
+<text  x="753.93" y="863.5" >o..</text>
+</g>
+<g >
+<title>java/lang/Throwable.fillInStackTrace (1 samples, 2.33%)</title><rect x="1080.2" y="133" width="27.5" height="15.0" fill="rgb(97,243,97)" rx="2" ry="2" />
+<text  x="1083.23" y="143.5" >j..</text>
+</g>
+<g >
+<title>org/mybatis/spring/SqlSessionTemplate.selectOne (1 samples, 2.33%)</title><rect x="366.7" y="661" width="27.5" height="15.0" fill="rgb(103,248,103)" rx="2" ry="2" />
+<text  x="369.74" y="671.5" >o..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeQuery (1 samples, 2.33%)</title><rect x="1025.3" y="837" width="27.5" height="15.0" fill="rgb(100,246,100)" rx="2" ry="2" />
+<text  x="1028.35" y="847.5" >o..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.unpackField (1 samples, 2.33%)</title><rect x="750.9" y="677" width="27.5" height="15.0" fill="rgb(68,216,68)" rx="2" ry="2" />
+<text  x="753.93" y="687.5" >c..</text>
+</g>
+<g >
+<title>java/lang/String.&lt;init&gt; (1 samples, 2.33%)</title><rect x="997.9" y="917" width="27.4" height="15.0" fill="rgb(75,223,75)" rx="2" ry="2" />
+<text  x="1000.91" y="927.5" >j..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/resultset/DefaultResultSetHandler.getNextResultSet (1 samples, 2.33%)</title><rect x="1080.2" y="373" width="27.5" height="15.0" fill="rgb(61,210,61)" rx="2" ry="2" />
+<text  x="1083.23" y="383.5" >o..</text>
+</g>
+<g >
+<title>java/net/AbstractPlainSocketImpl.available (1 samples, 2.33%)</title><rect x="1135.1" y="277" width="27.5" height="15.0" fill="rgb(90,237,90)" rx="2" ry="2" />
+<text  x="1138.12" y="287.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.readFromUnderlyingStreamIfNecessary (1 samples, 2.33%)</title><rect x="778.4" y="661" width="27.4" height="15.0" fill="rgb(93,239,93)" rx="2" ry="2" />
+<text  x="781.37" y="671.5" >c..</text>
+</g>
+<g >
+<title>VMThread::run() (1 samples, 2.33%)</title><rect x="10.0" y="933" width="27.4" height="15.0" fill="rgb(191,191,55)" rx="2" ry="2" />
+<text  x="13.00" y="943.5" >V..</text>
+</g>
+<g >
+<title>StatSamplerTask::task() (1 samples, 2.33%)</title><rect x="147.2" y="901" width="27.5" height="15.0" fill="rgb(189,189,55)" rx="2" ry="2" />
+<text  x="150.21" y="911.5" >S..</text>
+</g>
+<g >
+<title>com/google/code/yanf4j/core/impl/AbstractController.notifyException (1 samples, 2.33%)</title><rect x="229.5" y="933" width="27.5" height="15.0" fill="rgb(84,231,84)" rx="2" ry="2" />
+<text  x="232.53" y="943.5" >c..</text>
+</g>
+<g >
+<title>org/quartz/simpl/SimpleThreadPool$WorkerThread.run (10 samples, 23.26%)</title><rect x="915.6" y="965" width="274.4" height="15.0" fill="rgb(100,246,100)" rx="2" ry="2" />
+<text  x="918.58" y="975.5" >org/quartz/simpl/SimpleThreadPool$Wo..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.clearInputStream (1 samples, 2.33%)</title><rect x="1135.1" y="325" width="27.5" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="1138.12" y="335.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sendCommand (1 samples, 2.33%)</title><rect x="805.8" y="725" width="27.5" height="15.0" fill="rgb(105,250,105)" rx="2" ry="2" />
+<text  x="808.81" y="735.5" >c..</text>
+</g>
+<g >
+<title>java_lang_Throwable::fill_in_stack_trace(Handle, methodHandle, Thread*) (1 samples, 2.33%)</title><rect x="860.7" y="517" width="27.4" height="15.0" fill="rgb(199,199,59)" rx="2" ry="2" />
+<text  x="863.70" y="527.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.setString (1 samples, 2.33%)</title><rect x="833.3" y="821" width="27.4" height="15.0" fill="rgb(86,233,86)" rx="2" ry="2" />
+<text  x="836.26" y="831.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.realClose (1 samples, 2.33%)</title><rect x="723.5" y="741" width="27.4" height="15.0" fill="rgb(95,241,95)" rx="2" ry="2" />
+<text  x="726.49" y="751.5" >c..</text>
+</g>
+<g >
+<title>sun/nio/ch/EPollArrayWrapper.epollWait (1 samples, 2.33%)</title><rect x="257.0" y="885" width="27.4" height="15.0" fill="rgb(67,215,67)" rx="2" ry="2" />
+<text  x="259.98" y="895.5" >s..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.setFollowNewestSerialize (1 samples, 2.33%)</title><rect x="366.7" y="917" width="27.5" height="15.0" fill="rgb(109,254,109)" rx="2" ry="2" />
+<text  x="369.74" y="927.5" >c..</text>
+</g>
+<g >
+<title>sys_futex (2 samples, 4.65%)</title><rect x="586.3" y="725" width="54.9" height="15.0" fill="rgb(219,119,0)" rx="2" ry="2" />
+<text  x="589.28" y="735.5" >sys_f..</text>
+</g>
+<g >
+<title>ch/qos/logback/classic/spi/ThrowableProxy.&lt;init&gt; (1 samples, 2.33%)</title><rect x="229.5" y="837" width="27.5" height="15.0" fill="rgb(252,125,125)" rx="2" ry="2" />
+<text  x="232.53" y="847.5" >c..</text>
+</g>
+<g >
+<title>java/util/concurrent/ScheduledThreadPoolExecutor$DelayedWorkQueue.take (8 samples, 18.60%)</title><rect x="421.6" y="885" width="219.6" height="15.0" fill="rgb(62,211,62)" rx="2" ry="2" />
+<text  x="424.63" y="895.5" >java/util/concurrent/Schedule..</text>
+</g>
+<g >
+<title>java/lang/Object.wait (3 samples, 6.98%)</title><rect x="915.6" y="949" width="82.3" height="15.0" fill="rgb(73,221,73)" rx="2" ry="2" />
+<text  x="918.58" y="959.5" >java/lang..</text>
+</g>
+<g >
+<title>ObjectMonitor::wait(long, bool, Thread*) (3 samples, 6.98%)</title><rect x="284.4" y="901" width="82.3" height="15.0" fill="rgb(201,201,59)" rx="2" ry="2" />
+<text  x="287.42" y="911.5" >ObjectMon..</text>
+</g>
+<g >
+<title>_raw_spin_unlock_irqrestore (1 samples, 2.33%)</title><rect x="613.7" y="645" width="27.5" height="15.0" fill="rgb(247,147,0)" rx="2" ry="2" />
+<text  x="616.72" y="655.5" >_..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="696.0" y="661" width="27.5" height="15.0" fill="rgb(65,214,65)" rx="2" ry="2" />
+<text  x="699.05" y="671.5" >c..</text>
+</g>
+<g >
+<title>java/lang/StringBuilder.toString (1 samples, 2.33%)</title><rect x="997.9" y="933" width="27.4" height="15.0" fill="rgb(68,216,68)" rx="2" ry="2" />
+<text  x="1000.91" y="943.5" >j..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.available (1 samples, 2.33%)</title><rect x="1135.1" y="293" width="27.5" height="15.0" fill="rgb(92,238,92)" rx="2" ry="2" />
+<text  x="1138.12" y="303.5" >j..</text>
+</g>
+<g >
+<title>sun/reflect/GeneratedMethodAccessor48.invoke (1 samples, 2.33%)</title><rect x="888.1" y="837" width="27.5" height="15.0" fill="rgb(81,229,81)" rx="2" ry="2" />
+<text  x="891.14" y="847.5" >s..</text>
+</g>
+<g >
+<title>futex_wake (1 samples, 2.33%)</title><rect x="449.1" y="661" width="27.4" height="15.0" fill="rgb(215,115,0)" rx="2" ry="2" />
+<text  x="452.07" y="671.5" >f..</text>
+</g>
+<g >
+<title>java/util/HashMap.removeNode (1 samples, 2.33%)</title><rect x="723.5" y="677" width="27.4" height="15.0" fill="rgb(79,226,79)" rx="2" ry="2" />
+<text  x="726.49" y="687.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ConnectionImpl.commit (1 samples, 2.33%)</title><rect x="888.1" y="789" width="27.5" height="15.0" fill="rgb(90,237,90)" rx="2" ry="2" />
+<text  x="891.14" y="799.5" >c..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 2.33%)</title><rect x="778.4" y="565" width="27.4" height="15.0" fill="rgb(228,91,91)" rx="2" ry="2" />
+<text  x="781.37" y="575.5" >/..</text>
+</g>
+<g >
+<title>PerfLongVariant::sample() (1 samples, 2.33%)</title><rect x="147.2" y="885" width="27.5" height="15.0" fill="rgb(220,220,66)" rx="2" ry="2" />
+<text  x="150.21" y="895.5" >P..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.readAllResults (1 samples, 2.33%)</title><rect x="366.7" y="229" width="27.5" height="15.0" fill="rgb(68,217,68)" rx="2" ry="2" />
+<text  x="369.74" y="239.5" >c..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/common/dao/interceptor/PaginationInterceptor.intercept (1 samples, 2.33%)</title><rect x="1107.7" y="565" width="27.4" height="15.0" fill="rgb(50,200,50)" rx="2" ry="2" />
+<text  x="1110.67" y="575.5" >c..</text>
+</g>
+<g >
+<title>org/apache/ibatis/binding/MapperMethod.execute (5 samples, 11.63%)</title><rect x="1052.8" y="853" width="137.2" height="15.0" fill="rgb(57,206,57)" rx="2" ry="2" />
+<text  x="1055.79" y="863.5" >org/apache/ibatis..</text>
+</g>
+<g >
+<title>org/apache/ibatis/binding/MapperMethod.execute (1 samples, 2.33%)</title><rect x="366.7" y="677" width="27.5" height="15.0" fill="rgb(59,208,59)" rx="2" ry="2" />
+<text  x="369.74" y="687.5" >o..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (2 samples, 4.65%)</title><rect x="174.7" y="869" width="54.8" height="15.0" fill="rgb(226,87,87)" rx="2" ry="2" />
+<text  x="177.65" y="879.5" >/lib/..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (2 samples, 4.65%)</title><rect x="504.0" y="789" width="54.8" height="15.0" fill="rgb(248,148,0)" rx="2" ry="2" />
+<text  x="506.95" y="799.5" >entry..</text>
+</g>
+<g >
+<title>net/rubyeye/xmemcached/impl/MemcachedConnector.connect (1 samples, 2.33%)</title><rect x="641.2" y="949" width="27.4" height="15.0" fill="rgb(59,208,59)" rx="2" ry="2" />
+<text  x="644.16" y="959.5" >n..</text>
+</g>
+<g >
+<title>Monitor::wait(bool, long, bool) (1 samples, 2.33%)</title><rect x="10.0" y="901" width="27.4" height="15.0" fill="rgb(182,182,52)" rx="2" ry="2" />
+<text  x="13.00" y="911.5" >M..</text>
+</g>
+<g >
+<title>sun/reflect/GeneratedMethodAccessor43.invoke (5 samples, 11.63%)</title><rect x="1052.8" y="741" width="137.2" height="15.0" fill="rgb(70,219,70)" rx="2" ry="2" />
+<text  x="1055.79" y="751.5" >sun/reflect/Gener..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/StatementImpl.getMoreResults (1 samples, 2.33%)</title><rect x="1080.2" y="325" width="27.5" height="15.0" fill="rgb(97,243,97)" rx="2" ry="2" />
+<text  x="1083.23" y="335.5" >c..</text>
+</g>
+<g >
+<title>java/util/concurrent/ScheduledThreadPoolExecutor$DelayedWorkQueue.take (8 samples, 18.60%)</title><rect x="421.6" y="901" width="219.6" height="15.0" fill="rgb(53,203,53)" rx="2" ry="2" />
+<text  x="424.63" y="911.5" >java/util/concurrent/Schedule..</text>
+</g>
+<g >
+<title>java/util/regex/Matcher.search (1 samples, 2.33%)</title><rect x="1052.8" y="421" width="27.4" height="15.0" fill="rgb(63,212,63)" rx="2" ry="2" />
+<text  x="1055.79" y="431.5" >j..</text>
+</g>
+<g >
+<title>futex_wait (1 samples, 2.33%)</title><rect x="531.4" y="693" width="27.4" height="15.0" fill="rgb(196,96,0)" rx="2" ry="2" />
+<text  x="534.40" y="703.5" >f..</text>
+</g>
+<g >
+<title>Java_java_net_PlainSocketImpl_socketAvailable (1 samples, 2.33%)</title><rect x="668.6" y="597" width="27.4" height="15.0" fill="rgb(222,82,82)" rx="2" ry="2" />
+<text  x="671.60" y="607.5" >J..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.fill (1 samples, 2.33%)</title><rect x="888.1" y="629" width="27.5" height="15.0" fill="rgb(69,218,69)" rx="2" ry="2" />
+<text  x="891.14" y="639.5" >c..</text>
+</g>
+<g >
+<title>WatcherThread::run() (7 samples, 16.28%)</title><rect x="37.4" y="933" width="192.1" height="15.0" fill="rgb(228,228,69)" rx="2" ry="2" />
+<text  x="40.44" y="943.5" >WatcherThread::run()</text>
+</g>
+<g >
+<title>ch/qos/logback/classic/Logger.buildLoggingEventAndAppend (1 samples, 2.33%)</title><rect x="229.5" y="869" width="27.5" height="15.0" fill="rgb(252,126,126)" rx="2" ry="2" />
+<text  x="232.53" y="879.5" >c..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/BaseExecutor.query (5 samples, 11.63%)</title><rect x="1052.8" y="661" width="137.2" height="15.0" fill="rgb(65,213,65)" rx="2" ry="2" />
+<text  x="1055.79" y="671.5" >org/apache/ibatis..</text>
+</g>
+<g >
+<title>org/apache/commons/pool2/impl/GenericObjectPool.borrowObject (3 samples, 6.98%)</title><rect x="668.6" y="837" width="82.3" height="15.0" fill="rgb(64,213,64)" rx="2" ry="2" />
+<text  x="671.60" y="847.5" >org/apach..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.read (1 samples, 2.33%)</title><rect x="805.8" y="581" width="27.5" height="15.0" fill="rgb(86,233,86)" rx="2" ry="2" />
+<text  x="808.81" y="591.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 2.33%)</title><rect x="1135.1" y="357" width="27.5" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="1138.12" y="367.5" >c..</text>
+</g>
+<g >
+<title>SYSC_recvfrom (1 samples, 2.33%)</title><rect x="888.1" y="469" width="27.5" height="15.0" fill="rgb(223,123,0)" rx="2" ry="2" />
+<text  x="891.14" y="479.5" >S..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sendCommand (1 samples, 2.33%)</title><rect x="1135.1" y="341" width="27.5" height="15.0" fill="rgb(104,249,104)" rx="2" ry="2" />
+<text  x="1138.12" y="351.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 2.33%)</title><rect x="778.4" y="709" width="27.4" height="15.0" fill="rgb(94,240,94)" rx="2" ry="2" />
+<text  x="781.37" y="719.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.realClose (1 samples, 2.33%)</title><rect x="1162.6" y="389" width="27.4" height="15.0" fill="rgb(101,246,101)" rx="2" ry="2" />
+<text  x="1165.56" y="399.5" >c..</text>
+</g>
+<g >
+<title>sock_ioctl (1 samples, 2.33%)</title><rect x="943.0" y="821" width="27.5" height="15.0" fill="rgb(220,120,0)" rx="2" ry="2" />
+<text  x="946.02" y="831.5" >s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.checkErrorPacket (1 samples, 2.33%)</title><rect x="805.8" y="709" width="27.5" height="15.0" fill="rgb(73,221,73)" rx="2" ry="2" />
+<text  x="808.81" y="719.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.readResultsForQueryOrUpdate (1 samples, 2.33%)</title><rect x="750.9" y="709" width="27.5" height="15.0" fill="rgb(67,216,67)" rx="2" ry="2" />
+<text  x="753.93" y="719.5" >c..</text>
+</g>
+<g >
+<title>_raw_spin_unlock_irqrestore (1 samples, 2.33%)</title><rect x="449.1" y="629" width="27.4" height="15.0" fill="rgb(209,109,0)" rx="2" ry="2" />
+<text  x="452.07" y="639.5" >_..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sqlQueryDirect (1 samples, 2.33%)</title><rect x="1025.3" y="757" width="27.5" height="15.0" fill="rgb(99,245,99)" rx="2" ry="2" />
+<text  x="1028.35" y="767.5" >c..</text>
+</g>
+<g >
+<title>BacktraceBuilder::push(Method*, int, Thread*) (1 samples, 2.33%)</title><rect x="1080.2" y="37" width="27.5" height="15.0" fill="rgb(191,191,55)" rx="2" ry="2" />
+<text  x="1083.23" y="47.5" >B..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.readAllResults (1 samples, 2.33%)</title><rect x="1025.3" y="741" width="27.5" height="15.0" fill="rgb(84,232,84)" rx="2" ry="2" />
+<text  x="1028.35" y="751.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.readAllResults (1 samples, 2.33%)</title><rect x="668.6" y="693" width="27.4" height="15.0" fill="rgb(63,211,63)" rx="2" ry="2" />
+<text  x="671.60" y="703.5" >c..</text>
+</g>
+<g >
+<title>hrtimer_start_range_ns (1 samples, 2.33%)</title><rect x="257.0" y="725" width="27.4" height="15.0" fill="rgb(202,102,0)" rx="2" ry="2" />
+<text  x="259.98" y="735.5" >h..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.close (1 samples, 2.33%)</title><rect x="860.7" y="757" width="27.4" height="15.0" fill="rgb(60,209,60)" rx="2" ry="2" />
+<text  x="863.70" y="767.5" >c..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.triggersFired (3 samples, 6.98%)</title><rect x="833.3" y="949" width="82.3" height="15.0" fill="rgb(99,244,99)" rx="2" ry="2" />
+<text  x="836.26" y="959.5" >org/quart..</text>
+</g>
+<g >
+<title>futex_wait_queue_me (1 samples, 2.33%)</title><rect x="531.4" y="677" width="27.4" height="15.0" fill="rgb(254,154,0)" rx="2" ry="2" />
+<text  x="534.40" y="687.5" >f..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeUpdate (1 samples, 2.33%)</title><rect x="805.8" y="805" width="27.5" height="15.0" fill="rgb(101,246,101)" rx="2" ry="2" />
+<text  x="808.81" y="815.5" >c..</text>
+</g>
+<g >
+<title>sun/reflect/GeneratedMethodAccessor69.invoke (1 samples, 2.33%)</title><rect x="366.7" y="581" width="27.5" height="15.0" fill="rgb(66,214,66)" rx="2" ry="2" />
+<text  x="369.74" y="591.5" >s..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.checkErrorPacket (1 samples, 2.33%)</title><rect x="888.1" y="725" width="27.5" height="15.0" fill="rgb(83,231,83)" rx="2" ry="2" />
+<text  x="891.14" y="735.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="860.7" y="709" width="27.4" height="15.0" fill="rgb(61,210,61)" rx="2" ry="2" />
+<text  x="863.70" y="719.5" >c..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.read (1 samples, 2.33%)</title><rect x="888.1" y="613" width="27.5" height="15.0" fill="rgb(63,212,63)" rx="2" ry="2" />
+<text  x="891.14" y="623.5" >j..</text>
+</g>
+<g >
+<title>do_syscall_64 (1 samples, 2.33%)</title><rect x="778.4" y="533" width="27.4" height="15.0" fill="rgb(210,110,0)" rx="2" ry="2" />
+<text  x="781.37" y="543.5" >d..</text>
+</g>
+<g >
+<title>ep_poll (1 samples, 2.33%)</title><rect x="257.0" y="789" width="27.4" height="15.0" fill="rgb(192,92,0)" rx="2" ry="2" />
+<text  x="259.98" y="799.5" >e..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (8 samples, 18.60%)</title><rect x="10.0" y="965" width="219.5" height="15.0" fill="rgb(218,76,76)" rx="2" ry="2" />
+<text  x="13.00" y="975.5" >/lib/x86_64-linux-gnu/libpthr..</text>
+</g>
+<g >
+<title>java/net/SocketInputStream.socketRead (1 samples, 2.33%)</title><rect x="778.4" y="597" width="27.4" height="15.0" fill="rgb(71,219,71)" rx="2" ry="2" />
+<text  x="781.37" y="607.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 2.33%)</title><rect x="805.8" y="693" width="27.5" height="15.0" fill="rgb(69,217,69)" rx="2" ry="2" />
+<text  x="808.81" y="703.5" >c..</text>
+</g>
+<g >
+<title>net/rubyeye/xmemcached/impl/MemcachedConnector$InnerControllerStateListener.onException (1 samples, 2.33%)</title><rect x="229.5" y="917" width="27.5" height="15.0" fill="rgb(83,230,83)" rx="2" ry="2" />
+<text  x="232.53" y="927.5" >n..</text>
+</g>
+<g >
+<title>try_to_wake_up (1 samples, 2.33%)</title><rect x="613.7" y="661" width="27.5" height="15.0" fill="rgb(225,125,0)" rx="2" ry="2" />
+<text  x="616.72" y="671.5" >t..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.checkClosed (1 samples, 2.33%)</title><rect x="860.7" y="725" width="27.4" height="15.0" fill="rgb(65,214,65)" rx="2" ry="2" />
+<text  x="863.70" y="735.5" >c..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/resultset/DefaultResultSetHandler.handleResultSets (1 samples, 2.33%)</title><rect x="1080.2" y="389" width="27.5" height="15.0" fill="rgb(52,201,52)" rx="2" ry="2" />
+<text  x="1083.23" y="399.5" >o..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 2.33%)</title><rect x="888.1" y="533" width="27.5" height="15.0" fill="rgb(248,148,0)" rx="2" ry="2" />
+<text  x="891.14" y="543.5" >e..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="1162.6" y="357" width="27.4" height="15.0" fill="rgb(97,243,97)" rx="2" ry="2" />
+<text  x="1165.56" y="367.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/SQLError.createSQLException (1 samples, 2.33%)</title><rect x="1162.6" y="309" width="27.4" height="15.0" fill="rgb(106,251,106)" rx="2" ry="2" />
+<text  x="1165.56" y="319.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 2.33%)</title><rect x="668.6" y="725" width="27.4" height="15.0" fill="rgb(86,233,86)" rx="2" ry="2" />
+<text  x="671.60" y="735.5" >c..</text>
+</g>
+<g >
+<title>finish_task_switch (1 samples, 2.33%)</title><rect x="531.4" y="629" width="27.4" height="15.0" fill="rgb(238,138,0)" rx="2" ry="2" />
+<text  x="534.40" y="639.5" >f..</text>
+</g>
+<g >
+<title>sys_futex (1 samples, 2.33%)</title><rect x="943.0" y="853" width="27.5" height="15.0" fill="rgb(242,142,0)" rx="2" ry="2" />
+<text  x="946.02" y="863.5" >s..</text>
+</g>
+<g >
+<title>org/apache/commons/dbcp2/DelegatingPreparedStatement.executeUpdate (1 samples, 2.33%)</title><rect x="805.8" y="853" width="27.5" height="15.0" fill="rgb(80,227,80)" rx="2" ry="2" />
+<text  x="808.81" y="863.5" >o..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/Buffer.fastSkipLenString (1 samples, 2.33%)</title><rect x="750.9" y="661" width="27.5" height="15.0" fill="rgb(108,253,108)" rx="2" ry="2" />
+<text  x="753.93" y="671.5" >c..</text>
+</g>
+<g >
+<title>java/lang/Throwable.fillInStackTrace (1 samples, 2.33%)</title><rect x="860.7" y="581" width="27.4" height="15.0" fill="rgb(58,207,58)" rx="2" ry="2" />
+<text  x="863.70" y="591.5" >j..</text>
+</g>
+<g >
+<title>do_futex (1 samples, 2.33%)</title><rect x="339.3" y="821" width="27.4" height="15.0" fill="rgb(203,103,0)" rx="2" ry="2" />
+<text  x="342.30" y="831.5" >d..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/core/season/mao/impl/SeasonMaoImpl.lambda$getAppSeasonBeanInList$228 (1 samples, 2.33%)</title><rect x="366.7" y="741" width="27.5" height="15.0" fill="rgb(73,221,73)" rx="2" ry="2" />
+<text  x="369.74" y="751.5" >c..</text>
+</g>
+<g >
+<title>all (43 samples, 100%)</title><rect x="10.0" y="981" width="1180.0" height="15.0" fill="rgb(244,115,115)" rx="2" ry="2" />
+<text  x="13.00" y="991.5" ></text>
+</g>
+<g >
+<title>com/mysql/jdbc/StatementImpl.realClose (1 samples, 2.33%)</title><rect x="860.7" y="773" width="27.4" height="15.0" fill="rgb(82,229,82)" rx="2" ry="2" />
+<text  x="863.70" y="783.5" >c..</text>
+</g>
+<g >
+<title>do_syscall_64 (1 samples, 2.33%)</title><rect x="202.1" y="837" width="27.4" height="15.0" fill="rgb(201,101,0)" rx="2" ry="2" />
+<text  x="205.09" y="847.5" >d..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 2.33%)</title><rect x="778.4" y="789" width="27.4" height="15.0" fill="rgb(76,224,76)" rx="2" ry="2" />
+<text  x="781.37" y="799.5" >c..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.executeInNonManagedTXLock (1 samples, 2.33%)</title><rect x="1025.3" y="885" width="27.5" height="15.0" fill="rgb(55,204,55)" rx="2" ry="2" />
+<text  x="1028.35" y="895.5" >o..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/CachingExecutor.query (5 samples, 11.63%)</title><rect x="1052.8" y="693" width="137.2" height="15.0" fill="rgb(77,225,77)" rx="2" ry="2" />
+<text  x="1055.79" y="703.5" >org/apache/ibatis..</text>
+</g>
+<g >
+<title>org/apache/ibatis/executor/BaseExecutor.getConnection (2 samples, 4.65%)</title><rect x="1135.1" y="597" width="54.9" height="15.0" fill="rgb(99,245,99)" rx="2" ry="2" />
+<text  x="1138.12" y="607.5" >org/a..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/util/ReadAheadInputStream.readFromUnderlyingStreamIfNecessary (1 samples, 2.33%)</title><rect x="805.8" y="629" width="27.5" height="15.0" fill="rgb(89,235,89)" rx="2" ry="2" />
+<text  x="808.81" y="639.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeUpdate (1 samples, 2.33%)</title><rect x="805.8" y="821" width="27.5" height="15.0" fill="rgb(77,225,77)" rx="2" ry="2" />
+<text  x="808.81" y="831.5" >c..</text>
+</g>
+<g >
+<title>com/bilibili/app/bangumi/common/dao/interceptor/PaginationInterceptor.needPagination (1 samples, 2.33%)</title><rect x="1107.7" y="549" width="27.4" height="15.0" fill="rgb(97,243,97)" rx="2" ry="2" />
+<text  x="1110.67" y="559.5" >c..</text>
+</g>
+<g >
+<title>CompactibleFreeListSpace::free() const (1 samples, 2.33%)</title><rect x="147.2" y="853" width="27.5" height="15.0" fill="rgb(204,204,60)" rx="2" ry="2" />
+<text  x="150.21" y="863.5" >C..</text>
+</g>
+<g >
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (1 samples, 2.33%)</title><rect x="366.7" y="597" width="27.5" height="15.0" fill="rgb(53,203,53)" rx="2" ry="2" />
+<text  x="369.74" y="607.5" >s..</text>
+</g>
+<g >
+<title>java/sql/SQLException.&lt;init&gt; (1 samples, 2.33%)</title><rect x="1080.2" y="181" width="27.5" height="15.0" fill="rgb(64,213,64)" rx="2" ry="2" />
+<text  x="1083.23" y="191.5" >j..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 2.33%)</title><rect x="888.1" y="773" width="27.5" height="15.0" fill="rgb(50,200,50)" rx="2" ry="2" />
+<text  x="891.14" y="783.5" >c..</text>
+</g>
+<g >
+<title>tcp_recvmsg (1 samples, 2.33%)</title><rect x="888.1" y="421" width="27.5" height="15.0" fill="rgb(209,109,0)" rx="2" ry="2" />
+<text  x="891.14" y="431.5" >t..</text>
+</g>
+<g >
+<title>java_lang_Throwable::fill_in_stack_trace(Handle, methodHandle) (1 samples, 2.33%)</title><rect x="1162.6" y="181" width="27.4" height="15.0" fill="rgb(186,186,54)" rx="2" ry="2" />
+<text  x="1165.56" y="191.5" >j..</text>
+</g>
+<g >
+<title>Monitor::IWait(Thread*, long) (1 samples, 2.33%)</title><rect x="10.0" y="885" width="27.4" height="15.0" fill="rgb(218,218,65)" rx="2" ry="2" />
+<text  x="13.00" y="895.5" >M..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreCMT.getNonManagedTXConnection (3 samples, 6.98%)</title><rect x="668.6" y="917" width="82.3" height="15.0" fill="rgb(107,252,107)" rx="2" ry="2" />
+<text  x="671.60" y="927.5" >org/quart..</text>
+</g>
+<g >
+<title>sys_futex (1 samples, 2.33%)</title><rect x="202.1" y="821" width="27.4" height="15.0" fill="rgb(206,106,0)" rx="2" ry="2" />
+<text  x="205.09" y="831.5" >s..</text>
+</g>
+<g >
+<title>JVM_FillInStackTrace (1 samples, 2.33%)</title><rect x="1162.6" y="197" width="27.4" height="15.0" fill="rgb(222,82,82)" rx="2" ry="2" />
+<text  x="1165.56" y="207.5" >J..</text>
+</g>
+<g >
+<title>sun/reflect/DelegatingMethodAccessorImpl.invoke (1 samples, 2.33%)</title><rect x="888.1" y="853" width="27.5" height="15.0" fill="rgb(83,230,83)" rx="2" ry="2" />
+<text  x="891.14" y="863.5" >s..</text>
+</g>
+<g >
+<title>com/sun/proxy/$Proxy48.selectOne (1 samples, 2.33%)</title><rect x="366.7" y="645" width="27.5" height="15.0" fill="rgb(61,210,61)" rx="2" ry="2" />
+<text  x="369.74" y="655.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ResultSetImpl.close (1 samples, 2.33%)</title><rect x="723.5" y="757" width="27.4" height="15.0" fill="rgb(61,210,61)" rx="2" ry="2" />
+<text  x="726.49" y="767.5" >c..</text>
+</g>
+<g >
+<title>org/quartz/impl/jdbcjobstore/JobStoreSupport.triggeredJobComplete (1 samples, 2.33%)</title><rect x="1025.3" y="917" width="27.5" height="15.0" fill="rgb(54,204,54)" rx="2" ry="2" />
+<text  x="1028.35" y="927.5" >o..</text>
+</g>
+<g >
+<title>java/util/concurrent/locks/AbstractQueuedSynchronizer$ConditionObject.await (5 samples, 11.63%)</title><rect x="421.6" y="869" width="137.2" height="15.0" fill="rgb(97,243,97)" rx="2" ry="2" />
+<text  x="424.63" y="879.5" >java/util/concurr..</text>
+</g>
+<g >
+<title>do_syscall_64 (1 samples, 2.33%)</title><rect x="339.3" y="853" width="27.4" height="15.0" fill="rgb(192,92,0)" rx="2" ry="2" />
+<text  x="342.30" y="863.5" >d..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/PreparedStatement.executeInternal (1 samples, 2.33%)</title><rect x="1135.1" y="389" width="27.5" height="15.0" fill="rgb(87,234,87)" rx="2" ry="2" />
+<text  x="1138.12" y="399.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.buildResultSetWithRows (1 samples, 2.33%)</title><rect x="1025.3" y="693" width="27.5" height="15.0" fill="rgb(101,247,101)" rx="2" ry="2" />
+<text  x="1028.35" y="703.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.reuseAndReadPacket (1 samples, 2.33%)</title><rect x="888.1" y="709" width="27.5" height="15.0" fill="rgb(99,245,99)" rx="2" ry="2" />
+<text  x="891.14" y="719.5" >c..</text>
+</g>
+<g >
+<title>java/lang/Throwable.&lt;init&gt; (1 samples, 2.33%)</title><rect x="860.7" y="613" width="27.4" height="15.0" fill="rgb(65,213,65)" rx="2" ry="2" />
+<text  x="863.70" y="623.5" >j..</text>
+</g>
+<g >
+<title>java/lang/reflect/Method.invoke (1 samples, 2.33%)</title><rect x="888.1" y="869" width="27.5" height="15.0" fill="rgb(77,225,77)" rx="2" ry="2" />
+<text  x="891.14" y="879.5" >j..</text>
+</g>
+<g >
+<title>do_futex (1 samples, 2.33%)</title><rect x="202.1" y="773" width="27.4" height="15.0" fill="rgb(190,90,0)" rx="2" ry="2" />
+<text  x="205.09" y="783.5" >d..</text>
+</g>
+<g >
+<title>entry_SYSCALL_64_after_swapgs (1 samples, 2.33%)</title><rect x="339.3" y="869" width="27.4" height="15.0" fill="rgb(220,120,0)" rx="2" ry="2" />
+<text  x="342.30" y="879.5" >e..</text>
+</g>
+<g >
+<title>com/sun/proxy/$Proxy208.prepare (1 samples, 2.33%)</title><rect x="1107.7" y="597" width="27.4" height="15.0" fill="rgb(99,245,99)" rx="2" ry="2" />
+<text  x="1110.67" y="607.5" >c..</text>
+</g>
+<g >
+<title>java/lang/String.toLowerCase (1 samples, 2.33%)</title><rect x="1107.7" y="517" width="27.4" height="15.0" fill="rgb(87,234,87)" rx="2" ry="2" />
+<text  x="1110.67" y="527.5" >j..</text>
+</g>
+<g >
+<title>try_to_wake_up (1 samples, 2.33%)</title><rect x="586.3" y="645" width="27.4" height="15.0" fill="rgb(195,95,0)" rx="2" ry="2" />
+<text  x="589.28" y="655.5" >t..</text>
+</g>
+<g >
+<title>org/mybatis/spring/SqlSessionTemplate$SqlSessionInterceptor.invoke (1 samples, 2.33%)</title><rect x="366.7" y="629" width="27.5" height="15.0" fill="rgb(79,226,79)" rx="2" ry="2" />
+<text  x="369.74" y="639.5" >o..</text>
+</g>
+<g >
+<title>/lib/x86_64-linux-gnu/libpthread-2.19.so (deleted) (1 samples, 2.33%)</title><rect x="805.8" y="533" width="27.5" height="15.0" fill="rgb(216,74,74)" rx="2" ry="2" />
+<text  x="808.81" y="543.5" >/..</text>
+</g>
+<g >
+<title>com/google/code/yanf4j/nio/impl/Reactor.run (2 samples, 4.65%)</title><rect x="229.5" y="965" width="54.9" height="15.0" fill="rgb(76,224,76)" rx="2" ry="2" />
+<text  x="232.53" y="975.5" >com/g..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/MysqlIO.sendCommand (1 samples, 2.33%)</title><rect x="778.4" y="757" width="27.4" height="15.0" fill="rgb(83,230,83)" rx="2" ry="2" />
+<text  x="781.37" y="767.5" >c..</text>
+</g>
+<g >
+<title>com/mysql/jdbc/ConnectionImpl.execSQL (1 samples, 2.33%)</title><rect x="750.9" y="757" width="27.5" height="15.0" fill="rgb(75,223,75)" rx="2" ry="2" />
+<text  x="753.93" y="767.5" >c..</text>
+</g>
+<g >
+<title>org/apache/ibatis/plugin/Plugin.invoke (1 samples, 2.33%)</title><rect x="1107.7" y="581" width="27.4" height="15.0" fill="rgb(98,244,98)" rx="2" ry="2" />
+<text  x="1110.67" y="591.5" >o..</text>
+</g>
+<g >
+<title>lock_sock_fast (1 samples, 2.33%)</title><rect x="943.0" y="773" width="27.5" height="15.0" fill="rgb(215,115,0)" rx="2" ry="2" />
+<text  x="946.02" y="783.5" >l..</text>
+</g>
+<g >
+<title>java/lang/ref/ReferenceQueue.remove (3 samples, 6.98%)</title><rect x="284.4" y="949" width="82.3" height="15.0" fill="rgb(50,200,50)" rx="2" ry="2" />
+<text  x="287.42" y="959.5" >java/lang..</text>
+</g>
+</g>
+</svg>
