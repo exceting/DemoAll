@@ -1,0 +1,11 @@
+
+apply plugin: 'java-library'
+
+dependencies {
+    api libs['tracing']
+}
+
+jar {
+    baseName "simple-trace"
+    version ""
+}
