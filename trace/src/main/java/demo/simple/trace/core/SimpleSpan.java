@@ -16,7 +16,7 @@ import java.util.*;
 
 public class SimpleSpan implements Span {
 
-    private final BiliTracer biliTracer;
+    private final SimpleTracer biliTracer;
     private final long parentId; // 父span改值为0
     private final long startTime; // 计时开始开始时间戳
     private final Map<String, Object> tags;
@@ -30,7 +30,7 @@ public class SimpleSpan implements Span {
     private String project; // 追踪目标的项目名
     private String title;
 
-    SimpleSpan(BiliTracer tracer, String title, long startTime, Map<String, Object> initialTags, List<Reference> refs) {
+    SimpleSpan(SimpleTracer tracer, String title, long startTime, Map<String, Object> initialTags, List<Reference> refs) {
         this.biliTracer = tracer;// 这里传入的tracer是针对本次跟踪过程唯一对象，负责收集已完成的span
         this.title = title;
         this.startTime = startTime;
@@ -81,13 +81,14 @@ public class SimpleSpan implements Span {
         return baggage;
     }
 
+    //生成指定ID
     static long nextId() {
         return Math.abs(Hashing.farmHashFingerprint64()
                 .hashString(UUID.randomUUID().toString(), Charsets.UTF_8)
                 .asLong());
-
     }
 
+    //监控系统一般单位为纳秒
     static long nowMicros() {
         return System.currentTimeMillis() * 1000 * 1000;
     }

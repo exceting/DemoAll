@@ -5,10 +5,11 @@
 
 package demo.simple.trace.core;
 
-import demo.simple.trace.data.PushUtils;
+import demo.simple.trace.data.PushHandler;
+import demo.simple.trace.utils.PushUtils;
 import io.opentracing.*;
 import io.opentracing.propagation.Format;
-import javax.annotation.Nullable;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,33 +20,24 @@ import java.util.Map;
  * @version \: BiliTracer.java,v 0.1 2018-09-12 14:08
  * 追踪器
  */
-public class BiliTracer implements Tracer {
+public class SimpleTracer implements Tracer {
 
     private final List<SimpleSpan> finishedSpans = new ArrayList<>();
     private String project;
-    private boolean isDebug = false;
-    private Boolean sampled = null;
+    private Boolean sampled;
 
 
-    public BiliTracer(boolean sampled, String project, boolean isDebug) {
+    public SimpleTracer(boolean sampled, String project) {
         this.project = project;
         this.sampled = sampled;
-        this.isDebug = isDebug;
     }
 
-    public BiliTracer(String uri, String project, boolean isDebug) {
-        this();
+    public SimpleTracer(String uri, String project) {
         this.project = project;
-        if (isDebug) {
-            this.sampled = true;
-        } else {
-            this.sampled = PushUtils.sampled(uri);
-        }
-        this.isDebug = isDebug;
+        this.sampled = PushUtils.sampled(uri);
     }
 
-    @Nullable
-    public Boolean isSampled() {
+    public boolean isSampled() {
         return sampled;
     }
 
@@ -55,9 +47,6 @@ public class BiliTracer implements Tracer {
 
     public synchronized List<SimpleSpan> finishedSpans() {
         return new ArrayList<>(this.finishedSpans);
-    }
-
-    protected void onSpanFinished(SimpleSpan biliSpan) {
     }
 
     public String getProject() {
@@ -81,7 +70,7 @@ public class BiliTracer implements Tracer {
 
     @Override
     public <C> SpanContext extract(Format<C> format, C carrier) {
-        return this.propagator.extract(format, carrier);
+        return null;
     }
 
     @Override
@@ -94,24 +83,14 @@ public class BiliTracer implements Tracer {
      */
     synchronized void appendFinishedSpan(SimpleSpan biliSpan) {
         this.finishedSpans.add(biliSpan);
-        this.onSpanFinished(biliSpan);
     }
 
     public synchronized void pushSpans() {
         if (sampled != null && sampled) {
             List<SimpleSpan> finished = this.finishedSpans;
             if (finished.size() > 0) {
-                finished.stream().filter(SimpleSpan::sampled).forEach(f -> {
-
-                    if (pushSpan != null) {
-                        if (isDebug) {
-                            PushUdpHandler.getHandler().pushSpan(pushSpan.toByteArray());
-                        } else {
-                            PushUnixSockHandler.getHandler().pushSpan(pushSpan.toByteArray());
-                        }
-                    }
-                });
-                this.reset();
+                finished.stream().filter(SimpleSpan::sampled).forEach(span -> PushHandler.getHandler().pushSpan(span));
+                this.reset(); //每发生一次推送，则清理一次已完成span集合
             }
         }
     }
@@ -189,7 +168,7 @@ public class BiliTracer implements Tracer {
 
         @Override
         public Scope startActive(boolean finishOnClose) {
-            return BiliTracer.this.scopeManager().activate(this.startManual(), finishOnClose);
+            return SimpleTracer.this.scopeManager().activate(this.startManual(), finishOnClose);
         }
 
         @Override
@@ -206,7 +185,7 @@ public class BiliTracer implements Tracer {
             if (references.isEmpty() && !ignoringActiveSpan && activeSpanContext != null) {
                 references.add(new SimpleSpan.Reference((SimpleSpan.BiliSpanContext) activeSpanContext, References.CHILD_OF));
             }
-            return new SimpleSpan(BiliTracer.this, title, startMicros, initialTags, references);
+            return new SimpleSpan(SimpleTracer.this, title, startMicros, initialTags, references);
         }
     }
 

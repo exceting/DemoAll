@@ -3,7 +3,7 @@
  * Copyright (c) 2009-2018 All Rights Reserved.
  */
 
-package demo.simple.trace.data;
+package demo.simple.trace.utils;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Maps;
