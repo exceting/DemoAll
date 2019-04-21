@@ -5,6 +5,8 @@
 
 package demo.simple.trace.data;
 
+import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import demo.simple.trace.core.SimpleSpan;
 
 import java.util.concurrent.BlockingQueue;
@@ -46,12 +48,13 @@ public class PushHandler {
                             .append(", title=")
                             .append(span.title())
                             .append(", 耗时=")
-                            .append((span.endTime() / 1000000) - (span.startTime() / 1000000))
+                            .append((span.endTime() / 1000000) + " - " + (span.startTime() / 1000000) + " = " + ((span.endTime() / 1000000) - (span.startTime() / 1000000)))
                             .append("ms, tags=")
                             .append(span.tags().toString());
+
                     System.out.println(sb.toString());
                 } catch (InterruptedException e) {
-                    e.printStackTrace();
+                    System.err.println("err!! " + e.getMessage());
                 }
             }
         }
