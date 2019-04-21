@@ -1,5 +1,5 @@
 /**
- * Bilibili.com Inc.
+ * sharemer.com Inc.
  * Copyright (c) 2009-2018 All Rights Reserved.
  */
 
@@ -15,16 +15,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * @author sunqinwen
- * @version \: BiliTracer.java,v 0.1 2018-09-12 14:08
- * 追踪器
- */
+// 追踪器，实现Tracer接口
 public class SimpleTracer implements Tracer {
 
-    private final List<SimpleSpan> finishedSpans = new ArrayList<>();
-    private String project;
-    private Boolean sampled;
+    private final List<SimpleSpan> finishedSpans = new ArrayList<>(); //存放链路中已执行完成的span（finished span）
+    private String project; //项目名称
+    private Boolean sampled; //是否上报（由采样率算法生成该值）
 
 
     public SimpleTracer(boolean sampled, String project) {
@@ -34,7 +30,7 @@ public class SimpleTracer implements Tracer {
 
     public SimpleTracer(String uri, String project) {
         this.project = project;
-        this.sampled = PushUtils.sampled(uri);
+        this.sampled = PushUtils.sampled(uri); //本次追踪是否上报
     }
 
     public boolean isSampled() {
@@ -79,12 +75,13 @@ public class SimpleTracer implements Tracer {
     }
 
     /**
-     * 目前tracer我们建议非单例的，所以这个同步锁没什么卵用
+     * 目前tracer我们建议非单例的，所以这个同步锁没什么用
      */
     synchronized void appendFinishedSpan(SimpleSpan biliSpan) {
         this.finishedSpans.add(biliSpan);
     }
 
+    //上报span，这个方法一般在一次链路完成时调用，负责将finishedSpans里的数据上报给追踪系统
     public synchronized void pushSpans() {
         if (sampled != null && sampled) {
             List<SimpleSpan> finished = this.finishedSpans;
@@ -95,22 +92,14 @@ public class SimpleTracer implements Tracer {
         }
     }
 
-    private SpanContext activeSpanContext() {
-        Span span = activeSpan();
-        if (span == null) {
-            return null;
-        }
-
-        return span.context();
-    }
-
+    // Tracer对象内部类SpanBuilder，实现了标准里的Tracer.SpanBuilder接口，用来负责创建span
     public final class SpanBuilder implements Tracer.SpanBuilder {
-        private final String title;
-        private long startMicros;
-        private List<SimpleSpan.Reference> references = new ArrayList<>();
-        private boolean ignoringActiveSpan;
-        private Map<String, Object> initialTags = new HashMap<>();
+        private final String title; //操作名，也就是span的title
+        private long startMicros; //初始化开始时间
+        private List<SimpleSpan.Reference> references = new ArrayList<>(); //父子关系
+        private Map<String, Object> initialTags = new HashMap<>(); //tag描述信息初始化
 
+        //创建span用的title传入
         SpanBuilder(String title) {
             this.title = title;
         }
@@ -130,14 +119,14 @@ public class SimpleTracer implements Tracer {
 
         @Override
         public SpanBuilder ignoreActiveSpan() {
-            ignoringActiveSpan = true;
             return this;
         }
 
         @Override
         public SpanBuilder addReference(String referenceType, SpanContext referencedContext) {
             if (referencedContext != null) {
-                this.references.add(new SimpleSpan.Reference((SimpleSpan.BiliSpanContext) referencedContext, referenceType));
+                //添加父子关系，其实这里就是初始化了Span里的Reference对象，这个对象会在创建Span对象时作为参数传进去，然后具体关系的确立，是在Span对象内（具体Span类的代码段会展示）
+                this.references.add(new SimpleSpan.Reference((SimpleSpan.SimpleSpanContext) referencedContext, referenceType));
             }
             return this;
         }
@@ -168,7 +157,7 @@ public class SimpleTracer implements Tracer {
 
         @Override
         public Scope startActive(boolean finishOnClose) {
-            return SimpleTracer.this.scopeManager().activate(this.startManual(), finishOnClose);
+            return null;
         }
 
         @Override
@@ -177,14 +166,11 @@ public class SimpleTracer implements Tracer {
         }
 
         @Override
-        public SimpleSpan startManual() {
+        public SimpleSpan startManual() { //创建并开始一个span
             if (this.startMicros == 0) {
-                this.startMicros = SimpleSpan.nowMicros();
+                this.startMicros = SimpleSpan.nowMicros(); //就是在这里初始化startTime的
             }
-            SpanContext activeSpanContext = activeSpanContext();
-            if (references.isEmpty() && !ignoringActiveSpan && activeSpanContext != null) {
-                references.add(new SimpleSpan.Reference((SimpleSpan.BiliSpanContext) activeSpanContext, References.CHILD_OF));
-            }
+            //这里触发SimpleSpan的构造方法
             return new SimpleSpan(SimpleTracer.this, title, startMicros, initialTags, references);
         }
     }

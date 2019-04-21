@@ -1,5 +1,5 @@
 /**
- * Bilibili.com Inc.
+ * sharemer.com Inc.
  * Copyright (c) 2009-2018 All Rights Reserved.
  */
 
@@ -17,11 +17,6 @@ public class PushUtils {
 
     private static final Map<String, Long> requestMap = Maps.newConcurrentMap();
 
-    /**
-     * 上报概率计算，
-     * @param uri
-     * @return
-     */
     public static boolean sampled(String uri) {
 
         if (Strings.isNullOrEmpty(uri)) {
@@ -37,8 +32,8 @@ public class PushUtils {
         if ((end - start) >= 60000) { //距离上次上报已经超过1min了
             requestMap.put(uri, end);
             return true;
-        } else { // 没超过5min，则按照1/2233的概率上报
-            if (random.nextInt(2232) == 0) {
+        } else { // 没超过1min，则按照1/1000的概率上报
+            if (random.nextInt(999) == 0) {
                 requestMap.put(uri, end);
                 return true;
             }
@@ -46,5 +41,4 @@ public class PushUtils {
 
         return false;
     }
-
 }

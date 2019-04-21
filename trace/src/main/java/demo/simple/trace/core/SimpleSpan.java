@@ -1,5 +1,5 @@
 /**
- * Bilibili.com Inc.
+ * sharemer.com Inc.
  * Copyright (c) 2009-2018 All Rights Reserved.
  */
 
@@ -14,58 +14,58 @@ import io.opentracing.SpanContext;
 import javax.annotation.Nullable;
 import java.util.*;
 
+// 链路Span，实现标准里的Span接口
 public class SimpleSpan implements Span {
 
-    private final SimpleTracer biliTracer;
-    private final long parentId; // 父span改值为0
+    private final SimpleTracer biliTracer; //链路追踪对象（一次追踪建议生成一个链路对象，尽量不要用单例，会有同步锁影响并发效率）
+    private final long parentId; // 父span该值为0
     private final long startTime; // 计时开始开始时间戳
-    private final Map<String, Object> tags;
-    private final List<LogEntry> logEntries = new ArrayList<>();
+    private final Map<String, Object> tags; //一些扩展信息
     private final List<Reference> references; // 关系，外部传入
     private final List<RuntimeException> errors = new ArrayList<>();
-    private BiliSpanContext context; // spanContext,内部包含追踪id、span自身id
+    private SimpleSpanContext context; // spanContext,内部包含traceId、span自身id
     private boolean finished; // 当前span是否结束标识
     private long endTime; // 计时结束时间戳
     private boolean sampled; // 是否为抽样数据，取决于父节点，依次嫡传下来给其子节点
     private String project; // 追踪目标的项目名
-    private String title;
+    private String title; //方法名
 
     SimpleSpan(SimpleTracer tracer, String title, long startTime, Map<String, Object> initialTags, List<Reference> refs) {
-        this.biliTracer = tracer;// 这里传入的tracer是针对本次跟踪过程唯一对象，负责收集已完成的span
+        this.biliTracer = tracer; // 这里传入的tracer是针对本次跟踪过程唯一对象，负责收集已完成的span
         this.title = title;
         this.startTime = startTime;
         this.project = tracer.getProject();
-        this.sampled = tracer.isSampled();
+        this.sampled = tracer.isSampled(); //是否上报，该字段根据具体的采样率方法生成
         if (initialTags == null) {
             this.tags = new HashMap<>();
         } else {
             this.tags = new HashMap<>(initialTags);
         }
-        if (refs == null) {
+        if (refs == null) { //span对象由tracer对象创建，创建时会把父子关系传入
             this.references = Collections.emptyList();
         } else {
             this.references = new ArrayList<>(refs);
         }
-        BiliSpanContext parent = findPreferredParentRef(this.references);
-        if (parent == null) {
-            // 父节点
-            this.context = new BiliSpanContext(nextId(), nextId(), new HashMap<>());
-            this.parentId = 0;
+        SimpleSpanContext parent = findPreferredParentRef(this.references); //查看是否存在父span
+        if (parent == null) {  //通常父span为空的情况，都是链路开始的地方，这里会生成traceId
+            // 当前链路还不存在父span，则本次span就置为父span，下面会生成traceId和当前父span的spanId
+            this.context = new SimpleSpanContext(nextId(), nextId(), new HashMap<>());
+            this.parentId = 0; //父span的parentId是0
         } else {
-            // 子节点
-            this.context = new BiliSpanContext(parent.traceId, nextId(), mergeBaggages(this.references));
+            // 当前链路已经存在父span了，那么子span的parentId置为当前父span的id，表示当前span是属于这个父span的子span，同时traceId也延用父span的（表示属于同一链路）
+            this.context = new SimpleSpanContext(parent.traceId, nextId(), mergeBaggages(this.references));
             this.parentId = parent.spanId;
         }
     }
 
     @Nullable
-    private static BiliSpanContext findPreferredParentRef(List<Reference> references) {
+    private static SimpleSpanContext findPreferredParentRef(List<Reference> references) {
         if (references.isEmpty()) {
             return null;
         }
         for (Reference reference : references) {
-            if (References.CHILD_OF.equals(reference.getReferenceType())) {
-                return reference.getContext();
+            if (References.CHILD_OF.equals(reference.getReferenceType())) { //现有的reference中存在父子关系（简单理解，这个关系就是BuildSpan的时候传入的）
+                return reference.getContext(); //返回父span的context信息（包含traceId和它的spanId）
             }
         }
         return references.get(0).getContext();
@@ -121,20 +121,12 @@ public class SimpleSpan implements Span {
         return new HashMap<>(this.tags);
     }
 
-    public List<LogEntry> logEntries() {
-        return new ArrayList<>(this.logEntries);
-    }
-
-    public List<RuntimeException> generatedErrors() {
-        return new ArrayList<>(errors);
-    }
-
     public List<Reference> references() {
         return new ArrayList<>(references);
     }
 
     @Override
-    public synchronized BiliSpanContext context() {
+    public synchronized SimpleSpanContext context() {
         return this.context;
     }
 
@@ -145,7 +137,7 @@ public class SimpleSpan implements Span {
 
     @Override
     public synchronized void finish(long endTime) {
-        finishedCheck("Finishing already finished span");
+        finishedCheck("当前span处于完成态");
         this.endTime = endTime;
         this.biliTracer.appendFinishedSpan(this);
         this.finished = true;
@@ -167,7 +159,7 @@ public class SimpleSpan implements Span {
     }
 
     private synchronized SimpleSpan setObjectTag(String key, Object value) {
-        finishedCheck("Adding tag {%s:%s} to already finished span", key, value);
+        finishedCheck("添加新tag {%s:%s} 失败，当前span处于完成态", key, value);
         tags.put(key, value);
         return this;
     }
@@ -179,8 +171,6 @@ public class SimpleSpan implements Span {
 
     @Override
     public final synchronized SimpleSpan log(long timestampMicros, Map<String, ?> fields) {
-        finishedCheck("Adding logs %s at %d to already finished span", fields, timestampMicros);
-        this.logEntries.add(new LogEntry(timestampMicros, fields));
         return this;
     }
 
@@ -196,7 +186,7 @@ public class SimpleSpan implements Span {
 
     @Override
     public synchronized Span setBaggageItem(String key, String value) {
-        finishedCheck("Adding baggage {%s:%s} to already finished span", key, value);
+        finishedCheck("添加新baggage {%s:%s} 失败，当前span处于完成态", key, value);
         this.context = this.context.withBaggageItem(key, value);
         return this;
     }
@@ -236,12 +226,13 @@ public class SimpleSpan implements Span {
                 + ", title:\"" + title + "\"}";
     }
 
-    public static final class BiliSpanContext implements SpanContext {
+    // SpanContext 
+    public static final class SimpleSpanContext implements SpanContext {
         private final long traceId;
         private final Map<String, String> baggage;
         private final long spanId;
 
-        public BiliSpanContext(long traceId, long spanId, Map<String, String> baggage) {
+        public SimpleSpanContext(long traceId, long spanId, Map<String, String> baggage) {
             this.baggage = baggage;
             this.traceId = traceId;
             this.spanId = spanId;
@@ -260,10 +251,10 @@ public class SimpleSpan implements Span {
             return spanId;
         }
 
-        public BiliSpanContext withBaggageItem(String key, String val) {
+        public SimpleSpanContext withBaggageItem(String key, String val) {
             Map<String, String> newBaggage = new HashMap<>(this.baggage);
             newBaggage.put(key, val);
-            return new BiliSpanContext(this.traceId, this.spanId, newBaggage);
+            return new SimpleSpanContext(this.traceId, this.spanId, newBaggage);
         }
 
         @Override
@@ -272,26 +263,16 @@ public class SimpleSpan implements Span {
         }
     }
 
-    public static final class LogEntry {
-        private final long timestampMicros;
-        private final Map<String, ?> fields;
-
-        LogEntry(long timestampMicros, Map<String, ?> fields) {
-            this.timestampMicros = timestampMicros;
-            this.fields = fields;
-        }
-    }
-
     public static final class Reference {
-        private final BiliSpanContext context;
+        private final SimpleSpanContext context;
         private final String referenceType;
 
-        public Reference(BiliSpanContext context, String referenceType) {
+        public Reference(SimpleSpanContext context, String referenceType) {
             this.context = context;
             this.referenceType = referenceType;
         }
 
-        public BiliSpanContext getContext() {
+        public SimpleSpanContext getContext() {
             return context;
         }
 
