@@ -17,7 +17,7 @@ public class PushHandler {
     private BlockingQueue<SimpleSpan> queue;
 
     private PushHandler() {
-        this.queue = new LinkedBlockingQueue<>();
+        this.queue = new LinkedBlockingQueue<>(); //数据管道
         new Thread(this::pushTask).start();
     }
 
@@ -56,5 +56,4 @@ public class PushHandler {
             }
         }
     }
-
 }

@@ -226,11 +226,11 @@ public class SimpleSpan implements Span {
                 + ", title:\"" + title + "\"}";
     }
 
-    // SpanContext 
+    // SimpleSpan的内部类SimpleSpanContext，存放当前Span的id、链路id，实现了标准里的SpanContext接口
     public static final class SimpleSpanContext implements SpanContext {
-        private final long traceId;
+        private final long traceId; //链路id
         private final Map<String, String> baggage;
-        private final long spanId;
+        private final long spanId; //spanId
 
         public SimpleSpanContext(long traceId, long spanId, Map<String, String> baggage) {
             this.baggage = baggage;
@@ -263,9 +263,9 @@ public class SimpleSpan implements Span {
         }
     }
 
-    public static final class Reference {
-        private final SimpleSpanContext context;
-        private final String referenceType;
+    public static final class Reference { //用于建立Span间关系的内部类
+        private final SimpleSpanContext context; //存放了某一个Span的context（用于跟当前span建立关系时使用）
+        private final String referenceType; //关系类型，目前有两种：child_of和follows_from，第一种代表当前span是上面context里span的子span，第二个相反，是上面context里的父span，因为简单实现的缘故，先只考虑第一种关系
 
         public Reference(SimpleSpanContext context, String referenceType) {
             this.context = context;
