@@ -14,7 +14,7 @@ import java.util.HashMap;
  */
 public class RpcServerInterceptor {
 
-    //服务的入口，Rpc服务处理请求之前要做的，一般这里产生上下文，并交给TL传递上下文对象，这里也是链路初始化的地方
+    /*//服务的入口，Rpc服务处理请求之前要做的，一般这里产生上下文，并交给TL传递上下文对象，这里也是链路初始化的地方
     public void beforeHandle(RpcRequest request) {
         Context context = new Context(); //上下文对象
         SimpleTracer tracer = null;
@@ -62,5 +62,5 @@ public class RpcServerInterceptor {
             parent.finish(); //结束掉parent Span
             tracer.pushSpans(); //上报这次产生的链路数据（spans）
         }
-    }
+    }*/
 }

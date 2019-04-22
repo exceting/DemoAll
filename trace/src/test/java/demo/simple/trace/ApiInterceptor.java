@@ -16,7 +16,7 @@ import java.util.HashMap;
 public class ApiInterceptor {
 
     //开始Http处理请求之前要做的，一般这里产生上下文，并交给TL传递上下文对象，这里也是链路初始化的地方
-    public void beforeHandle(Request request) {
+    /*public void beforeHandle(Request request) {
         Context context = new Context(); //上下文对象
         SimpleTracer tracer = null;
         SimpleSpan parent = null;
@@ -64,6 +64,6 @@ public class ApiInterceptor {
             parent.finish(); //结束掉parent Span
             tracer.pushSpans(); //上报这次产生的链路数据（spans）
         }
-    }
+    }*/
 
 }

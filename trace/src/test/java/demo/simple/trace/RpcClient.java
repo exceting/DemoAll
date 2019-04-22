@@ -10,7 +10,7 @@ import demo.simple.trace.utils.SpanTags;
  */
 public class RpcClient {
 
-    //等到服务端响应方法
+    /*//等到服务端响应方法
     public void requestRpc(RpcRequest request) {
         //调用前执行
         SimpleSpan span = null;
@@ -35,5 +35,5 @@ public class RpcClient {
         if(span != null){
             span.finish(); //完成本次追踪
         }
-    }
+    }*/
 }
