@@ -1,5 +1,6 @@
 package demo.simple.context;
 
+import demo.simple.trace.core.SimpleSpan;
 import demo.simple.trace.core.SimpleTracer;
 
 /**
@@ -8,7 +9,11 @@ import demo.simple.trace.core.SimpleTracer;
  */
 public class Context {
 
-    private SimpleTracer simpleTracer;
+    private SimpleTracer simpleTracer; //当前链路对象
+
+    private SimpleSpan parent; //当前链路全局父span
+
+    //也可以放很多别的上下文内容，这里省略...
 
     public SimpleTracer getSimpleTracer() {
         return simpleTracer;
@@ -16,5 +21,13 @@ public class Context {
 
     public void setSimpleTracer(SimpleTracer simpleTracer) {
         this.simpleTracer = simpleTracer;
+    }
+
+    public SimpleSpan getParent() {
+        return parent;
+    }
+
+    public void setParent(SimpleSpan parent) {
+        this.parent = parent;
     }
 }
