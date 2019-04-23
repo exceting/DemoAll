@@ -14,14 +14,14 @@ import java.lang.reflect.Field;
  */
 public class UnsafePlayer {
     public static void main(String[] args) throws Exception {
-        //通过反射实例化Unsafe
+        /*//通过反射实例化Unsafe
         Field f = Unsafe.class.getDeclaredField("theUnsafe");
         f.setAccessible(true);
         Unsafe unsafe = (Unsafe) f.get(null);
         //实例化Player
         Player player = (Player) unsafe.allocateInstance(Player.class);
         player.setName("li lei");
-        System.out.println(player.getName());
+        System.out.println(player.getName());*/
     }
 }
 
