@@ -4,10 +4,6 @@
  */
 package demo.jdk.unsafe;
 
-import sun.misc.Unsafe;
-
-import java.lang.reflect.Field;
-
 /**
  * @author sunqinwen
  * @version \: UnsafePlayer.java,v 0.1 2019-04-17 18:27
