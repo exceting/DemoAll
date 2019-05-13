@@ -5,8 +5,6 @@
 
 package demo.simple.trace.data;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
 import demo.simple.trace.core.SimpleSpan;
 
 import java.util.concurrent.BlockingQueue;
