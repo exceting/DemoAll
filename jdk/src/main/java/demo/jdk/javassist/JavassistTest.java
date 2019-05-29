@@ -4,11 +4,13 @@
  */
 package demo.jdk.javassist;
 
+import demo.jdk.javassist.test.Student;
 import javassist.*;
 import javassist.bytecode.AccessFlag;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 /**
  * @author sunqinwen
@@ -18,11 +20,49 @@ public class JavassistTest {
 
     public static void main(String[] args) throws Exception {
         ClassPool pool = ClassPool.getDefault();
+        //Class.forName("demo.jdk.javassist.test.Student");
+        //Class.forName("demo.jdk.javassist.test.Person");
         CtClass cc = pool.get("demo.jdk.javassist.test.Student");
         cc.setSuperclass(pool.get("demo.jdk.javassist.test.Person"));
-        cc.writeFile();
-        JavassistTest test = new JavassistTest();
-        test.dynGenerateClass();
+        CtMethod[] methods = cc.getDeclaredMethods();
+        for(CtMethod m : methods){
+            String beforeCode = "System.out.println(\"方法\"+\""+m.getName()+"\"+\"被调用-开始\");";
+            String afterCode = "System.out.println(\"方法\"+\""+m.getName()+"\"+\"被调用-结束\");";
+            System.out.println(beforeCode);
+            System.out.println(afterCode);
+            m.insertBefore(beforeCode);
+            m.insertAfter(afterCode, true);
+        }
+        System.out.println(Student.class.getResource("").getPath());
+        cc.writeFile(Student.class.getResource("/").getPath());
+        //JavassistTest test = new JavassistTest();
+        //test.dynGenerateClass();
+
+
+
+        System.out.println("-------------------------------------------------");
+
+        Student student = new Student();
+        student.setId(1);
+        student.setHomework("sdds");
+        student.getId();
+        student.getHomework();
+
+        new Thread(()->{
+            try {
+                Thread.sleep(2000L);
+                Thread.currentThread().getContextClassLoader().loadClass(Student.class.getName());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            Student student2 = new Student();
+            student2.setId(1);
+            student2.setHomework("sdds");
+            student2.getId();
+            student2.getHomework();
+        }).start();
+
+        System.out.println("main end");
     }
 
     public void dynGenerateClass() {
@@ -30,6 +70,7 @@ public class JavassistTest {
         CtClass ct = pool.makeClass("demo.jdk.javassist.test.GenerateClass");//创建类
         ct.setInterfaces(new CtClass[]{pool.makeInterface("java.lang.Cloneable")});//让类实现Cloneable接口
         try {
+            System.out.println(String.format("%s", "oo"));
             CtField f= new CtField(CtClass.intType,"id",ct);//获得一个类型为int，名称为id的字段
             f.setModifiers(AccessFlag.PUBLIC);//将字段设置为public
             ct.addField(f);//将字段设置到类上
