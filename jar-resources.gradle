@@ -15,7 +15,8 @@ ext {
             'commons-pool'  : '2.6.0',
             'netty'         : '4.1.32.Final',
             'mybatis'       : '3.4.6',
-            'mybatis-spring': '1.3.2'
+            'mybatis-spring': '1.3.2',
+            'javassist'     : '3.25.0-GA'
     ]
     libs = [
             'junit'                        : "junit:junit:${versions['junit']}",
@@ -40,5 +41,6 @@ ext {
             'mybatis'                      : "org.mybatis:mybatis:${versions['mybatis']}",
             'mybatis-spring'               : "org.mybatis:mybatis-spring:${versions['mybatis-spring']}",
             'spring-jdbc'                  : "org.springframework:spring-jdbc:${versions['spring']}",
+            'javassist'                    : "org.javassist:javassist:${versions['javassist']}",
     ]
 }
