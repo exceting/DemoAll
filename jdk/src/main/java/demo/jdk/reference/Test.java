@@ -7,7 +7,7 @@ public class Test {
 
     public static void main(String[] args) {
 
-        int a = 1;
+        /*int a = 1;
         String b = "bb";
 
         Student student = new Student();
@@ -24,7 +24,10 @@ public class Test {
 
         Student student1 = new Student();
 
-        System.out.println(student.getClass().hashCode()+"=========="+student1.getClass().hashCode());
+        System.out.println(student.getClass().hashCode()+"=========="+student1.getClass().hashCode());*/
+
+        String s = "";
+        System.out.println(s.length());
     }
 
 }
