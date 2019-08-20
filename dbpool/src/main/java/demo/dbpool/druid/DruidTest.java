@@ -28,27 +28,16 @@ public class DruidTest {
 
         System.out.println("================"+connection+"====="+connection2);
 
+        DruidPooledConnection connection3 = druid.getConnection();
+        DruidPooledConnection connection4 = druid.getConnection();
+
+        System.out.println("================"+connection3+"====="+connection4);
+
+        DruidPooledConnection connection5 = druid.getConnection();
+        DruidPooledConnection connection6 = druid.getConnection();
+        System.out.println("================"+connection5+"====="+connection6);
+
         druid.close();
-
-        //DruidPooledConnection connection2 = druid.getConnection();
-
-        //System.out.println("================"+connection2);
-
-        A a = new AImpl();
-        A a2 = new AImpl();
-        System.out.println(a.getClass());
-
-        a.one();
-
-        System.out.println("===="+hash("1")+"      "+"1".hashCode());
-        System.out.println("===="+hash(a)+"      "+a.hashCode());
-        System.out.println("===="+hash(a)+"      "+a.hashCode());
-        System.out.println("===="+hash(a2)+"      "+a2.hashCode());
-    }
-
-    private static int hash(Object key) {
-        int h;
-        return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
     }
 
 }

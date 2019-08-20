@@ -4,6 +4,8 @@
  */
 package demo.jdk.javassist;
 
+import com.google.common.base.Splitter;
+import com.google.common.base.Strings;
 import demo.jdk.javassist.test.Student;
 import javassist.*;
 import javassist.bytecode.AccessFlag;
@@ -11,6 +13,8 @@ import javassist.bytecode.AccessFlag;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.URI;
+import java.util.List;
 
 /**
  * @author sunqinwen
@@ -19,7 +23,7 @@ import java.lang.reflect.Method;
 public class JavassistTest {
 
     public static void main(String[] args) throws Exception {
-        ClassPool pool = ClassPool.getDefault();
+        /*ClassPool pool = ClassPool.getDefault();
         //Class.forName("demo.jdk.javassist.test.Student");
         //Class.forName("demo.jdk.javassist.test.Person");
         CtClass cc = pool.get("demo.jdk.javassist.test.Student");
@@ -62,7 +66,24 @@ public class JavassistTest {
             student2.getHomework();
         }).start();
 
-        System.out.println("main end");
+        System.out.println("main end");*/
+
+        //System.out.println(String.format("%03d", 34146 % 500));
+
+        System.out.println(transferJdbcUrl("jdbc:mysql://172.18.16.44:3370/bili2_platform?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&autoReconnect=true&zeroDateTimeBehavior=convertToNull"));
+    }
+
+    static String transferJdbcUrl(String url) {
+        try {
+            if (Strings.isNullOrEmpty(url)) {
+                return null;
+            }
+            URI uri = new URI(url.replace(":", ""));
+            List<String> segments = Splitter.on("/").splitToList(uri.getPath());
+            return segments.get(segments.size() - 1);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public void dynGenerateClass() {
