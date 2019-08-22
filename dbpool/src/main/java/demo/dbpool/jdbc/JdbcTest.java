@@ -4,6 +4,9 @@
  */
 package demo.dbpool.jdbc;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -14,6 +17,8 @@ import java.sql.Statement;
  * @version \: JdbcTest.java,v 0.1 2019-08-20 15:46
  */
 public class JdbcTest {
+
+    private static Logger logger = LoggerFactory.getLogger(JdbcTest.class);
 
     public static void main(String[] args) throws Exception {
         //Class.forName("com.mysql.jdbc.Driver");
@@ -26,15 +31,19 @@ public class JdbcTest {
         try {
             int i = 0;
             while (i < 100) {
-                ResultSet resultSet = statement.executeQuery("select id FROM t_pay_order_201908 WHERE id = 1");
-                resultSet.next();
-                int id = resultSet.getInt("id");
-                System.out.println("id = " + id);
-                i++;
-                if (i == 60) {
-                    System.out.println("已经过了60s辣~");
+                try {
+                    ResultSet resultSet = statement.executeQuery("select id FROM t_pay_order_201908 WHERE id = 1");
+                    resultSet.next();
+                    int id = resultSet.getInt("id");
+                    System.out.println("id = " + id);
+                    i++;
+                    if (i == 60) {
+                        System.out.println("已经过了60s辣~");
+                    }
+                    Thread.sleep(100000L);
+                } catch (Exception e) {
+                    logger.warn("执行失败！", e);
                 }
-                Thread.sleep(100000L);
             }
         } finally {
             statement.close();

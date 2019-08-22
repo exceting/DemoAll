@@ -25,7 +25,7 @@ public class MakeDruid {
         druid.setValidationQuery("SELECT 1");
         druid.setTimeBetweenLogStatsMillis(1000);
         druid.setInitialSize(1);
-        druid.setTestWhileIdle(false);
+        druid.setTestWhileIdle(true);
         druid.setTimeBetweenEvictionRunsMillis(60000);
         druid.setQueryTimeout(1);
         druid.setMaxActive(max);
