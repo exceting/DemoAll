@@ -6,17 +6,19 @@ package demo.dbpool.druid;
 
 import com.alibaba.druid.pool.DruidDataSource;
 
+import java.sql.SQLException;
+
 /**
  * @author sunqinwen
  * @version \: MakeDruid.java,v 0.1 2019-01-29 15:27
  */
 public class MakeDruid {
 
-    public static DruidDataSource makeDruidDatasource() {
+    public static DruidDataSource makeDruidDatasource() throws SQLException {
         return makeDruidDatasource("kabii_db", 2, 2);
     }
 
-    public static DruidDataSource makeDruidDatasource(String db, int max, int min) {
+    public static DruidDataSource makeDruidDatasource(String db, int max, int min) throws SQLException {
         DruidDataSource druid = new DruidDataSource();
         druid.setUrl(String.format("jdbc:mysql://127.0.0.1:3306/%s?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&autoReconnect=true&zeroDateTimeBehavior=convertToNull", db));
         druid.setDriverClassName("com.mysql.jdbc.Driver");
@@ -31,6 +33,7 @@ public class MakeDruid {
         druid.setMaxActive(max);
         druid.setMinIdle(min);
         druid.setMaxWait(1000L);
+        druid.init();
         return druid;
     }
 

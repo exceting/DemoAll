@@ -11,13 +11,15 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 
+import java.sql.SQLException;
+
 @Configuration
 @MapperScan(basePackages = "demo.dbpool", sqlSessionFactoryRef = "sqlSession", annotationClass = Mapper.class)
 public class DataSourceConfig {
 
     @Primary
     @Bean(name = "dataSource", destroyMethod = "close")
-    public DruidDataSource dataSource() {
+    public DruidDataSource dataSource() throws SQLException {
         return MakeDruid.makeDruidDatasource();
     }
 
