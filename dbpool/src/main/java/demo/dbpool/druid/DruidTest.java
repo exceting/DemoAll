@@ -20,7 +20,7 @@ public class DruidTest {
         DruidDataSource druid = MakeDruid.makeDruidDatasource();
 
         DruidPooledConnection connection = druid.getConnection();
-        DruidPooledConnection connection2 = druid.getConnection();
+        /*DruidPooledConnection connection2 = druid.getConnection();
         System.out.println("================"+connection+"====="+connection2);
 
         connection.close();
@@ -35,7 +35,7 @@ public class DruidTest {
 
         DruidPooledConnection connection5 = druid.getConnection();
         DruidPooledConnection connection6 = druid.getConnection();
-        System.out.println("================"+connection5+"====="+connection6);
+        System.out.println("================"+connection5+"====="+connection6);*/
 
         druid.close();
     }
