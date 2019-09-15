@@ -15,18 +15,18 @@ import java.sql.SQLException;
 public class MakeDruid {
 
     public static DruidDataSource makeDruidDatasource() throws SQLException {
-        return makeDruidDatasource("kabii_db", 2, 2);
+        return makeDruidDatasource("lynx", 2, 2);
     }
 
     public static DruidDataSource makeDruidDatasource(String db, int max, int min) throws SQLException {
         DruidDataSource druid = new DruidDataSource();
-        druid.setUrl(String.format("jdbc:mysql://127.0.0.1:3306/%s?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&autoReconnect=true&zeroDateTimeBehavior=convertToNull", db));
+        druid.setUrl(String.format("jdbc:mysql://127.0.0.1:3306/%s?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&autoReconnect=true&zeroDateTimeBehavior=convertToNull", db));
         druid.setDriverClassName("com.mysql.jdbc.Driver");
         druid.setUsername("root");
-        druid.setPassword("sun123456");
+        druid.setPassword("sun123456`");
         druid.setValidationQuery("SELECT 1");
         druid.setTimeBetweenLogStatsMillis(1000);
-        druid.setInitialSize(0);
+        druid.setInitialSize(1);
         druid.setTestWhileIdle(true);
         druid.setTimeBetweenEvictionRunsMillis(60000);
         druid.setQueryTimeout(1);

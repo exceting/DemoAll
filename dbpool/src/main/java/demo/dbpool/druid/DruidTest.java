@@ -7,7 +7,11 @@ package demo.dbpool.druid;
 import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.druid.pool.DruidPooledConnection;
 
+import java.sql.Connection;
+import java.sql.Driver;
+import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.ServiceLoader;
 
 /**
  * @author sunqinwen
@@ -20,24 +24,18 @@ public class DruidTest {
         DruidDataSource druid = MakeDruid.makeDruidDatasource();
 
         DruidPooledConnection connection = druid.getConnection();
-        /*DruidPooledConnection connection2 = druid.getConnection();
-        System.out.println("================"+connection+"====="+connection2);
 
         connection.close();
-        connection2.close();
-
-        System.out.println("================"+connection+"====="+connection2);
-
-        DruidPooledConnection connection3 = druid.getConnection();
-        DruidPooledConnection connection4 = druid.getConnection();
-
-        System.out.println("================"+connection3+"====="+connection4);
-
-        DruidPooledConnection connection5 = druid.getConnection();
-        DruidPooledConnection connection6 = druid.getConnection();
-        System.out.println("================"+connection5+"====="+connection6);*/
-
         druid.close();
+
+        Connection connection2 = DriverManager.getConnection(
+                "jdbc:mysql://127.0.0.1:3306/lynx?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&autoReconnect=true&zeroDateTimeBehavior=convertToNull",
+                "root", "sun123456`");
+
+        ServiceLoader<Driver> drivers = ServiceLoader.load(Driver.class);
+        for (Driver d : drivers) {
+            System.out.println(d.getClass().getName());
+        }
     }
 
 }
