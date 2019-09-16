@@ -5,7 +5,7 @@ ext {
             'springboot'    : '2.0.0.RELEASE',
             'guava'         : '24.0-jre',
             'fastjson'      : '1.2.46',
-            'druid'         : '1.1.12',
+            'druid'         : '1.1.16',
             'mysql'         : '8.0.17',
             'slf4j'         : '1.7.7',
             'kryo'          : '4.0.2',

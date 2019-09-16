@@ -17,7 +17,7 @@ import java.sql.Statement;
  */
 public class PoolTest {
     public static void main(String[] args) throws Exception {
-        DruidDataSource druid = MakeDruid.makeDruidDatasource("pugv_pay", 1, 1);
+        /*DruidDataSource druid = MakeDruid.makeDruidDatasource("pugv_pay", 1, 1);
 
             int i = 0;
             while (i < 100) {
@@ -34,7 +34,10 @@ public class PoolTest {
                 statement.close();
                 conn.close();
                 Thread.sleep(100000L);
-            }
+            }*/
 
+        for (int i = 0; i < 5; i++) {
+            System.out.println(i);
+        }
     }
 }

@@ -7,11 +7,10 @@ package demo.dbpool.druid;
 import com.alibaba.druid.pool.DruidDataSource;
 import com.alibaba.druid.pool.DruidPooledConnection;
 
-import java.sql.Connection;
-import java.sql.Driver;
-import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.ServiceLoader;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Random;
 
 /**
  * @author sunqinwen
@@ -24,6 +23,10 @@ public class DruidTest {
         DruidDataSource druid = MakeDruid.makeDruidDatasource();
 
         DruidPooledConnection connection = druid.getConnection();
+        //connection.close();
+        //System.out.println(createOrderNo().length());
+        /*DruidPooledConnection connection2 = druid.getConnection();
+        System.out.println("================"+connection+"====="+connection2);
 
         connection.close();
         druid.close();
@@ -35,7 +38,12 @@ public class DruidTest {
         ServiceLoader<Driver> drivers = ServiceLoader.load(Driver.class);
         for (Driver d : drivers) {
             System.out.println(d.getClass().getName());
-        }
+        }*/
+    }
+
+    public static String createOrderNo() {
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMddHHmm");
+        return String.format("%s%05d", dtf.format(LocalDateTime.now()), new Random().nextInt(99999));
     }
 
 }

@@ -7,6 +7,8 @@ package demo.dbpool.druid;
 import com.alibaba.druid.pool.DruidDataSource;
 
 import java.sql.SQLException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * @author sunqinwen
@@ -33,7 +35,9 @@ public class MakeDruid {
         druid.setMaxActive(max);
         druid.setMinIdle(min);
         druid.setMaxWait(1000L);
-        //druid.init();
+        //druid.setAsyncInit(true);
+        //druid.setCreateScheduler(Executors.newScheduledThreadPool(2));
+        druid.init();
         return druid;
     }
 
