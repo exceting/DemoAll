@@ -1,5 +1,6 @@
 package demo.dbpool.filters;
 
+import com.alibaba.druid.filter.AutoLoad;
 import com.alibaba.druid.filter.Filter;
 import com.alibaba.druid.filter.FilterChain;
 import com.alibaba.druid.pool.DruidDataSource;
@@ -21,6 +22,7 @@ import java.util.concurrent.Executor;
 /**
  * Create by 18073 on 2019/9/14.
  */
+
 public class ButterFilter implements Filter {
     @Override
     public void init(DataSourceProxy dataSource) {

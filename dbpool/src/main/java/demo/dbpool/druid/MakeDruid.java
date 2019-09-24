@@ -28,17 +28,20 @@ public class MakeDruid {
         druid.setPassword("sun123456`");
         druid.setValidationQuery("SELECT 1");
         druid.setTimeBetweenLogStatsMillis(1000);
-        druid.setInitialSize(1);
+        druid.setInitialSize(2);
         druid.setTestWhileIdle(true);
         druid.setTimeBetweenEvictionRunsMillis(60000);
         druid.setQueryTimeout(1);
         druid.setMaxActive(max);
         druid.setMinIdle(min);
         druid.setMaxWait(1000L);
+        druid.setRemoveAbandoned(true);
+        druid.setRemoveAbandonedTimeoutMillis(60 * 1000L);
         //druid.setAsyncInit(true);
         //druid.setCreateScheduler(Executors.newScheduledThreadPool(2));
         druid.init();
         return druid;
     }
+
 
 }

@@ -18,12 +18,13 @@ import java.util.Random;
  */
 public class DruidTest {
 
-    public static void main(String[] args) throws SQLException {
+    public static void main(String[] args) throws SQLException, InterruptedException {
 
         DruidDataSource druid = MakeDruid.makeDruidDatasource();
 
+        Thread.sleep(120 * 1000L);
         DruidPooledConnection connection = druid.getConnection();
-        //connection.close();
+        connection.close();
         //System.out.println(createOrderNo().length());
         /*DruidPooledConnection connection2 = druid.getConnection();
         System.out.println("================"+connection+"====="+connection2);
@@ -39,11 +40,11 @@ public class DruidTest {
         for (Driver d : drivers) {
             System.out.println(d.getClass().getName());
         }*/
+        Thread.sleep(10 * 60 * 1000L);
     }
 
     public static String createOrderNo() {
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMddHHmm");
         return String.format("%s%05d", dtf.format(LocalDateTime.now()), new Random().nextInt(99999));
     }
-
 }
