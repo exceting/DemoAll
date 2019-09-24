@@ -16,7 +16,8 @@ ext {
             'netty'         : '4.1.32.Final',
             'mybatis'       : '3.4.6',
             'mybatis-spring': '1.3.2',
-            'javassist'     : '3.25.0-GA'
+            'javassist'     : '3.25.0-GA',
+            'hikari-cp'     : '3.3.1',
     ]
     libs = [
             'junit'                        : "junit:junit:${versions['junit']}",
@@ -42,5 +43,6 @@ ext {
             'mybatis-spring'               : "org.mybatis:mybatis-spring:${versions['mybatis-spring']}",
             'spring-jdbc'                  : "org.springframework:spring-jdbc:${versions['spring']}",
             'javassist'                    : "org.javassist:javassist:${versions['javassist']}",
+            'hikari-cp'                    : "com.zaxxer:HikariCP:${versions['hikari-cp']}",
     ]
 }

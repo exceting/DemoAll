@@ -24,6 +24,7 @@ dependencies {
     implementation libs['mysql']
     implementation libs['mybatis']
     implementation libs['mybatis-spring']
+    implementation libs['hikari-cp']
 }
 
 println 'hello world!'
