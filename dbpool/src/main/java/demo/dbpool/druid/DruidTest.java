@@ -24,6 +24,7 @@ public class DruidTest {
 
         Thread.sleep(120 * 1000L);
         DruidPooledConnection connection = druid.getConnection();
+        connection.createStatement();
         connection.close();
         //System.out.println(createOrderNo().length());
         /*DruidPooledConnection connection2 = druid.getConnection();
