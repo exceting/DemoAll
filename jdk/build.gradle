@@ -16,8 +16,3 @@ dependencies {
     implementation libs['ttl']
     implementation libs['javassist']
 }
-
-def task = {
-    implementation
-}
-classes.dependsOn task
