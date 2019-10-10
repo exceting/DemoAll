@@ -4,7 +4,6 @@ dependencies {
     implementation libs["junit"]
     implementation libs["fastjson"]
     implementation libs['slf4j']
-    implementation libs['junit']
     implementation libs['guava']
     implementation libs['ttl']
     implementation libs['javassist']

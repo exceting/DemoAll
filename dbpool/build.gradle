@@ -13,12 +13,10 @@ dependencies {
     implementation libs["springboot-starter-web"]
     implementation libs["springboot-starter-aop"]
     implementation libs["spring-context-support"]
-    implementation libs["springboot-starter-aop"]
     implementation libs["springboot-autoconfigure"]
     implementation libs["spring-jdbc"]
     implementation libs["fastjson"]
     implementation libs['slf4j']
-    implementation libs['junit']
     implementation libs['guava']
     implementation libs['druid']
     implementation libs['mysql']
@@ -26,8 +24,6 @@ dependencies {
     implementation libs['mybatis-spring']
     implementation libs['hikari-cp']
 }
-
-println 'hello world!'
 
 bootJar {
     baseName "dbpool"
