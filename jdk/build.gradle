@@ -7,4 +7,5 @@ dependencies {
     implementation libs['guava']
     implementation libs['ttl']
     implementation libs['javassist']
+    implementation libs['swing']
 }
