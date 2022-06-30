@@ -2,7 +2,7 @@
  * sharemer.com Inc.
  * Copyright (c) 2009-2019 All Rights Reserved.
  */
-package demo.leetcode.other;
+package demo.leetcode.other.tree;
 
 /**
  * @author sunqinwen
@@ -10,6 +10,16 @@ package demo.leetcode.other;
  * 简单的二叉查找树实现（假设无重复数据）
  */
 public class BinaryTree {
+
+    public static void main(String[] args) {
+        BinaryTree bt = new BinaryTree();
+        bt.insert(6);
+        bt.insert(8);
+        bt.insert(9);
+        bt.insert(1);
+        bt.insert(5);
+        System.out.println(bt.find(5));
+    }
 
     private TreeNode root;
 
@@ -59,41 +69,40 @@ public class BinaryTree {
     public boolean del(int data) {
 
 
-
         return true;
     }
 
-}
+    static class TreeNode {
 
-class TreeNode {
+        private int data;
 
-    private int data;
+        private TreeNode left;
 
-    private TreeNode left;
+        private TreeNode right;
 
-    private TreeNode right;
+        public TreeNode(int data) {
+            this.data = data;
+        }
 
-    public TreeNode(int data) {
-        this.data = data;
+        public int getData() {
+            return data;
+        }
+
+        public TreeNode getLeft() {
+            return left;
+        }
+
+        public void setLeft(TreeNode left) {
+            this.left = left;
+        }
+
+        public TreeNode getRight() {
+            return right;
+        }
+
+        public void setRight(TreeNode right) {
+            this.right = right;
+        }
     }
 
-    public int getData() {
-        return data;
-    }
-
-    public TreeNode getLeft() {
-        return left;
-    }
-
-    public void setLeft(TreeNode left) {
-        this.left = left;
-    }
-
-    public TreeNode getRight() {
-        return right;
-    }
-
-    public void setRight(TreeNode right) {
-        this.right = right;
-    }
 }

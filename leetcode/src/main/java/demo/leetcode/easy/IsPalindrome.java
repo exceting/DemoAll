@@ -13,7 +13,7 @@ package demo.leetcode.easy;
  * 输出: true
  * <p>
  * <p>
- * 示例 2:
+ * 示例2:
  * <p>
  * 输入: -121
  * 输出: false
