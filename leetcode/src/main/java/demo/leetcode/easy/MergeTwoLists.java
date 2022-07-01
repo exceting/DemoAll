@@ -25,32 +25,60 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class MergeTwoLists {
 
-    public static void main(String[] args){
+    public static void main(String[] args) {
         MergeTwoLists s = new MergeTwoLists();
-        s.mergeTwoLists(null, null);
+        ListNode result = s.mergeTwoLists(new ListNode(1, new ListNode(2, new ListNode(4))), new ListNode(1, new ListNode(3, new ListNode(4))));
+        while (result != null) {
+            System.out.println(result.val);
+            result = result.next;
+        }
     }
 
-    public ListNode mergeTwoLists(ListNode l1, ListNode l2) {
-        AtomicInteger incre = new AtomicInteger(1);
-        incre.incrementAndGet();
-        incre.incrementAndGet();
+    public ListNode mergeTwoLists(ListNode list1, ListNode list2) {
+        if (list1 == null) {
+            return list2;
+        }
+        if (list2 == null) {
+            return list1;
+        }
+        ListNode result = new ListNode(0);
+        ListNode p = result;
+        while (list1 != null && list2 != null) {
+            if (list1.val > list2.val) {
+                p.next = list2;
+                p = p.next;
+                list2 = list2.next;
+            } else {
+                p.next = list1;
+                p = p.next;
+                list1 = list1.next;
+            }
+        }
+        if (list1 != null) {
+            p.next = list1;
+        }
+        if (list2 != null) {
+            p.next = list2;
+        }
+        return result.next;
+    }
 
-        AtomicLong incre2 = new AtomicLong();
-        incre2.addAndGet(100L);
-        incre2.addAndGet(100L);
-        System.out.println(incre.get() +"   "+incre2.get());
-        return null;
+    static class ListNode {
+        int val;
+        ListNode next;
+
+        ListNode() {
+        }
+
+        ListNode(int val) {
+            this.val = val;
+        }
+
+        ListNode(int val, ListNode next) {
+            this.val = val;
+            this.next = next;
+        }
     }
 
 }
 
-class ListNode {
-
-    int val;
-
-    ListNode next;
-
-    ListNode(int x) {
-        val = x;
-    }
-}
