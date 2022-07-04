@@ -1,8 +1,5 @@
 package demo.leetcode.other.link;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-
 /**
  * 单向链表基本操作
  */
