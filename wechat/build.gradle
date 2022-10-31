@@ -1,0 +1,13 @@
+
+apply plugin: 'java-library'
+
+dependencies {
+    api libs['junit']
+    api libs['fastjson']
+    api libs['guava']
+}
+
+jar {
+    baseName "wechat"
+    version ""
+}

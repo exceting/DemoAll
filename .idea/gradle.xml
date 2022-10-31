@@ -18,6 +18,7 @@
             <option value="$PROJECT_DIR$/leetcode" />
             <option value="$PROJECT_DIR$/trace" />
             <option value="$PROJECT_DIR$/webtest" />
+            <option value="$PROJECT_DIR$/wechat" />
           </set>
         </option>
       </GradleProjectSettings>
