@@ -5,6 +5,7 @@ dependencies {
     api libs['fastjson']
     api libs['guava']
     api libs['retrofit']
+    api libs['flexmark']
     compileOnly libs['lombok']
     annotationProcessor libs['lombok']
     testCompileOnly libs['lombok']
