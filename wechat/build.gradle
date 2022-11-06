@@ -1,10 +1,14 @@
-
 apply plugin: 'java-library'
 
 dependencies {
     api libs['junit']
     api libs['fastjson']
     api libs['guava']
+    api libs['retrofit']
+    compileOnly libs['lombok']
+    annotationProcessor libs['lombok']
+    testCompileOnly libs['lombok']
+    testAnnotationProcessor libs['lombok']
 }
 
 jar {
