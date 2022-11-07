@@ -6,6 +6,8 @@ dependencies {
     api libs['guava']
     api libs['retrofit']
     api libs['flexmark']
+    api libs['flexmark-ext-tables']
+    api libs['flexmark-util']
     compileOnly libs['lombok']
     annotationProcessor libs['lombok']
     testCompileOnly libs['lombok']

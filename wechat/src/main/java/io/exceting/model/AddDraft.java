@@ -6,8 +6,9 @@ import lombok.Setter;
 
 @Setter
 @Getter
-public class MediaUpload extends Base {
-    private String url;
+public class AddDraft extends Base {
+
     @JSONField(name = "media_id")
     private String mediaId;
+
 }

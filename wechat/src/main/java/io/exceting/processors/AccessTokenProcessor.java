@@ -1,10 +1,19 @@
 package io.exceting.processors;
 
+import com.google.common.base.Joiner;
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
+import com.vladsch.flexmark.ext.tables.TablesExtension;
+import com.vladsch.flexmark.html.HtmlRenderer;
+import com.vladsch.flexmark.parser.Parser;
+import com.vladsch.flexmark.parser.ParserEmulationProfile;
+import com.vladsch.flexmark.util.ast.Node;
+import com.vladsch.flexmark.util.data.MutableDataSet;
+import com.vladsch.flexmark.util.misc.Extension;
 import io.exceting.api.WechatService;
 import io.exceting.common.Constants;
 import io.exceting.model.AccessToken;
+import io.exceting.model.AddDraft;
 import io.exceting.model.MediaUpload;
 
 import java.io.BufferedWriter;
@@ -12,6 +21,7 @@ import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
@@ -23,12 +33,32 @@ public class AccessTokenProcessor {
     }
 
     public static void main(String[] args) throws Exception {
-        INSTANT.attachToken("C:\\Users\\18073\\Desktop\\wechatAppInfo.txt", "C:\\Users\\18073\\Desktop\\wechatToken.txt");
+        AccessTokenProcessor.INSTANT.attachToken("/Users/sunqinwen/Downloads/wechatAppInfo.txt", "/Users/sunqinwen/Downloads/wechatToken.txt");
 
         MediaUpload upload = WechatService.INSTANT.imageUpload(Constants.VAL_MAP.get(Constants.VAL_MAP_KEY_TOKEN),
-                new File("D:\\29b7db477fcbec65844bc303fe306754.jpg"));
+                "image", new File("/Users/sunqinwen/Downloads/hahaha.png"));
 
-        System.out.println("上传成功！url = " + upload.getUrl());
+        System.out.println("上传成功！url = " + upload.getUrl() + "    mediaId = " + upload.getMediaId());
+
+        List<String> allLines = Files.readAllLines(Paths.get("/Users/sunqinwen/Downloads/LV1-3：java中的运算符.md"));
+        String content = Joiner.on("\n").join(allLines);
+        MutableDataSet options = new MutableDataSet();
+        options.setFrom(ParserEmulationProfile.MARKDOWN);
+        options.set(Parser.EXTENSIONS, Arrays.asList(new Extension[]{TablesExtension.create()}));
+        Parser parser = Parser.builder(options).build();
+        HtmlRenderer renderer = HtmlRenderer.builder(options).build();
+        Node document = parser.parse(content);
+        String html = renderer.render(document);
+
+        String html2 = "<h1>哈哈哈哈哈哈哈~ger</h1><br/><hr/><a href=\"https://www.bilibili.com\">哔哩哔哩</a><br/><span style='font-size:18px; color: red'>这是一张图片：</span><br/><img src='" + upload.getUrl() + "'/>";
+
+        AddDraft draft = WechatService.INSTANT.addDraft(Constants.VAL_MAP.get(Constants.VAL_MAP_KEY_TOKEN),
+                "图文消息测试~~",
+                "Java进化论",
+                html2,
+                upload.getMediaId());
+
+        System.out.println("draft mediaId = " + draft.getMediaId());
     }
 
     public void attachToken(String appIdPath, String accessTokenPath) throws Exception {

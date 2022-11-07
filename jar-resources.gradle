@@ -49,6 +49,8 @@ ext {
             'hikari-cp'                    : "com.zaxxer:HikariCP:${versions['hikari-cp']}",
             'retrofit'                     : "com.squareup.retrofit2:retrofit:${versions['retrofit']}",
             'lombok'                       : "org.projectlombok:lombok:${versions['lombok']}",
-            'flexmark'                     : "com.vladsch.flexmark:flexmark-all:${versions['flexmark']}"
+            'flexmark'                     : "com.vladsch.flexmark:flexmark:${versions['flexmark']}",
+            'flexmark-ext-tables'          : "com.vladsch.flexmark:flexmark-ext-tables:${versions['flexmark']}",
+            'flexmark-util'                : "com.vladsch.flexmark:flexmark-util:${versions['flexmark']}"
     ]
 }
