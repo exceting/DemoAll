@@ -20,7 +20,8 @@ ext {
             'hikari-cp'     : '3.3.1',
             'retrofit'      : '2.9.0',
             'lombok'        : '1.18.4',
-            'flexmark'      : '0.62.2'
+            'flexmark'      : '0.62.2',
+            'selenium'      : '2.33.0'
     ]
     libs = [
             'junit'                        : "junit:junit:${versions['junit']}",
@@ -51,6 +52,7 @@ ext {
             'lombok'                       : "org.projectlombok:lombok:${versions['lombok']}",
             'flexmark'                     : "com.vladsch.flexmark:flexmark:${versions['flexmark']}",
             'flexmark-ext-tables'          : "com.vladsch.flexmark:flexmark-ext-tables:${versions['flexmark']}",
-            'flexmark-util'                : "com.vladsch.flexmark:flexmark-util:${versions['flexmark']}"
+            'flexmark-util'                : "com.vladsch.flexmark:flexmark-util:${versions['flexmark']}",
+            'selenium'                     : "org.seleniumhq.selenium:selenium-java:${versions['selenium']}"
     ]
 }

@@ -8,6 +8,8 @@ public class Constants {
 
     public static final String WECHAT_URL = "https://api.weixin.qq.com";
 
+    public static final String QUORA_URL = "https://www.quora.com";
+
 
     public static final Map<String, String> VAL_MAP = Maps.newConcurrentMap();
 
