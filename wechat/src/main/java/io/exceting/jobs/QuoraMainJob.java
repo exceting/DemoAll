@@ -29,8 +29,8 @@ public class QuoraMainJob {
         // 初始化有道appkey
         InitProcessor.INSTANT.attachYoudaoKey("/Users/sunqinwen/Downloads/youdaoKey.txt");
 
-        String title = "外国人来中国后怎么看中国？";
-        QuoraAnswer answer = QuoraProcessor.INSTANT.getAnswerByUrl("Have-foreigners-changed-the-way-they-think-about-China-after-visiting", "Nazim-Mehboob");
+        String title = "Quora问题：你到中国后发现有什么和自己预想不一样的事物？";
+        QuoraAnswer answer = QuoraProcessor.INSTANT.getAnswerByUrl("Have-foreigners-changed-the-way-they-think-about-China-after-visiting", "Maya-Kaiser");
 
         List<String> images = Lists.newArrayList();
         answer.getSections().stream().filter(s -> s.getType().equals("image")).forEach(s -> s.getSpans().forEach(span -> images.add(span.getModifiers().getImage())));
@@ -52,7 +52,7 @@ public class QuoraMainJob {
         for (QuoraAnswer.Section section : answer.getSections()) {
             if (section.getType().equals("image")) {
                 for (QuoraAnswer.Section.Span span : section.getSpans()) {
-                    sb.append(String.format("<br/><img src = '%s'/><br/>", quoraToWechatMap.get(span.getModifiers().getImage())));
+                    sb.append(String.format("<center><img src = '%s'/></center>", quoraToWechatMap.get(span.getModifiers().getImage())));
                 }
             } else {
                 for (QuoraAnswer.Section.Span span : section.getSpans()) {
