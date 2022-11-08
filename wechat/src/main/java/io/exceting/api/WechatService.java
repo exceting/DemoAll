@@ -45,8 +45,8 @@ public class WechatService {
         }
     }
 
-    public MediaUpload imageUpload(String accessToken, String type, File file) throws Exception {
-        Call<MediaUpload> call = wechatApi.imageUpload(accessToken, type, prepareFilePart("media", file));
+    public MediaUpload imageUpload(String accessToken, String type, String fileName, byte[] file) throws Exception {
+        Call<MediaUpload> call = wechatApi.imageUpload(accessToken, type, prepareFilePart("media", fileName, file));
         Response<MediaUpload> response = call.execute();
         if (response.isSuccessful() && response.body() != null && response.body().getErrcode() == null) {
             return response.body();
@@ -84,8 +84,8 @@ public class WechatService {
         }
     }
 
-    private MultipartBody.Part prepareFilePart(String partName, File file) {
+    private MultipartBody.Part prepareFilePart(String partName, String fileName, byte[] file) {
         RequestBody requestFile = RequestBody.create(MediaType.parse("multipart/form-data"), file);
-        return MultipartBody.Part.createFormData(partName, file.getName(), requestFile);
+        return MultipartBody.Part.createFormData(partName, fileName, requestFile);
     }
 }

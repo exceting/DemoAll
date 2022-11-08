@@ -21,7 +21,8 @@ ext {
             'retrofit'      : '2.9.0',
             'lombok'        : '1.18.4',
             'flexmark'      : '0.62.2',
-            'selenium'      : '2.33.0'
+            'selenium'      : '2.33.0',
+            'commons-text'  : '1.1'
     ]
     libs = [
             'junit'                        : "junit:junit:${versions['junit']}",
@@ -53,6 +54,7 @@ ext {
             'flexmark'                     : "com.vladsch.flexmark:flexmark:${versions['flexmark']}",
             'flexmark-ext-tables'          : "com.vladsch.flexmark:flexmark-ext-tables:${versions['flexmark']}",
             'flexmark-util'                : "com.vladsch.flexmark:flexmark-util:${versions['flexmark']}",
-            'selenium'                     : "org.seleniumhq.selenium:selenium-java:${versions['selenium']}"
+            'selenium'                     : "org.seleniumhq.selenium:selenium-java:${versions['selenium']}",
+            'commons-text'                 : "org.apache.commons:commons-text:${versions['commons-text']}"
     ]
 }

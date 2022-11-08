@@ -25,18 +25,18 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
-public class AccessTokenProcessor {
+public class InitProcessor {
 
-    public static final AccessTokenProcessor INSTANT = new AccessTokenProcessor();
+    public static final InitProcessor INSTANT = new InitProcessor();
 
-    private AccessTokenProcessor() {
+    private InitProcessor() {
     }
 
     public static void main(String[] args) throws Exception {
-        AccessTokenProcessor.INSTANT.attachToken("/Users/sunqinwen/Downloads/wechatAppInfo.txt", "/Users/sunqinwen/Downloads/wechatToken.txt");
+        InitProcessor.INSTANT.attachAccessToken("/Users/sunqinwen/Downloads/wechatAppInfo.txt", "/Users/sunqinwen/Downloads/wechatToken.txt");
 
-        MediaUpload upload = WechatService.INSTANT.imageUpload(Constants.VAL_MAP.get(Constants.VAL_MAP_KEY_TOKEN),
-                "image", new File("/Users/sunqinwen/Downloads/hahaha.png"));
+        MediaUpload upload = WechatService.INSTANT.imageUpload(Constants.VAL_MAP.get(Constants.VAL_MAP_ACCESS_TOKEN),
+                "image", "", new byte[]{});
 
         System.out.println("上传成功！url = " + upload.getUrl() + "    mediaId = " + upload.getMediaId());
 
@@ -52,7 +52,7 @@ public class AccessTokenProcessor {
 
         String html2 = "<h1>哈哈哈哈哈哈哈~ger</h1><br/><hr/><a href=\"https://www.bilibili.com\">哔哩哔哩</a><br/><span style='font-size:18px; color: red'>这是一张图片：</span><br/><img src='" + upload.getUrl() + "'/>";
 
-        AddDraft draft = WechatService.INSTANT.addDraft(Constants.VAL_MAP.get(Constants.VAL_MAP_KEY_TOKEN),
+        AddDraft draft = WechatService.INSTANT.addDraft(Constants.VAL_MAP.get(Constants.VAL_MAP_ACCESS_TOKEN),
                 "图文消息测试~~",
                 "Java进化论",
                 html2,
@@ -61,16 +61,31 @@ public class AccessTokenProcessor {
         System.out.println("draft mediaId = " + draft.getMediaId());
     }
 
-    public void attachToken(String appIdPath, String accessTokenPath) throws Exception {
-        String token = readToken(accessTokenPath);
-        if (Strings.isNullOrEmpty(token)) {
-            refreshTokenAndApp(appIdPath, accessTokenPath);
-            token = readToken(accessTokenPath);
+    public void attachYoudaoKey(String youdaoPath) throws Exception {
+        String appKey = Constants.VAL_MAP.get(Constants.VAL_MAP_YOUDAO_APPKEY);
+        String secretKey = Constants.VAL_MAP.get(Constants.VAL_MAP_YOUDAO_SECRETKEY);
+        if (Strings.isNullOrEmpty(appKey) || Strings.isNullOrEmpty(secretKey)) {
+            List<String> lines = Lists.newArrayList();
+            try (Stream<String> in = Files.lines(Paths.get(youdaoPath))) {
+                in.forEach(lines::add);
+            }
+            if (lines.size() == 2) {
+                Constants.VAL_MAP.put(Constants.VAL_MAP_YOUDAO_APPKEY, lines.get(0));
+                Constants.VAL_MAP.put(Constants.VAL_MAP_YOUDAO_SECRETKEY, lines.get(1));
+            }
         }
-        Constants.VAL_MAP.put(Constants.VAL_MAP_KEY_TOKEN, token);
     }
 
-    private String readToken(String accessTokenPath) throws Exception {
+    public void attachAccessToken(String appIdPath, String accessTokenPath) throws Exception {
+        String token = readAccessToken(accessTokenPath);
+        if (Strings.isNullOrEmpty(token)) {
+            refreshTokenAndApp(appIdPath, accessTokenPath);
+            token = readAccessToken(accessTokenPath);
+        }
+        Constants.VAL_MAP.put(Constants.VAL_MAP_ACCESS_TOKEN, token);
+    }
+
+    private String readAccessToken(String accessTokenPath) throws Exception {
         File file = new File(accessTokenPath);
         if (!file.exists()) {
             if (!file.createNewFile()) {

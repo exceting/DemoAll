@@ -8,6 +8,7 @@ dependencies {
     api libs['flexmark']
     api libs['flexmark-ext-tables']
     api libs['flexmark-util']
+    api libs['commons-text']
     compileOnly libs['lombok']
     annotationProcessor libs['lombok']
     testCompileOnly libs['lombok']
@@ -18,3 +19,5 @@ jar {
     baseName "wechat"
     version ""
 }
+sourceCompatibility = JavaVersion.VERSION_1_9
+targetCompatibility = JavaVersion.VERSION_1_9
