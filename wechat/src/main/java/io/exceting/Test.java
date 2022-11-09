@@ -20,46 +20,57 @@ public class Test {
         //得到绘制坏境(这张图片的笔)
         Graphics2D gh = bi.createGraphics();
 
-        gh.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
         gh.setColor(Color.WHITE); //设置颜色
 
-        gh.fillRect(0, 0, 700, 150);//填充整张图片(其实就是设置背景色)
+        gh.fillRect(0, 0, 700, 150);
 
-        gh.setStroke(new BasicStroke(2f));
+        //gh.setStroke(new BasicStroke(2f));
+        gh.setColor(new Color(251, 114, 153));
+        gh.drawRect(6, 6, 690, 140);
         gh.setColor(new Color(0, 161, 214));
-        gh.drawRect(1, 1, 690, 140);//绘制一个四边形边框
-        gh.setColor(new Color(0, 161, 214, 139));
-        gh.drawRect(5, 5, 690, 140);//绘制一个四边形边框
-        gh.setColor(new Color(0, 161, 214, 66));
-        gh.drawRect(9, 9, 690, 140);//绘制一个四边形边框
+        gh.drawRect(1, 1, 690, 140);
 
-        //gh.setColor(Color.BLUE);//设置字体颜色
-        //
-        //
+        gh.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-        BufferedImage headImage = ImageIO.read(new URL("https://qph.cf2.quoracdn.net/main-thumb-14375812-50-h6jpm6BHaVF1OwkLDPTYOEHCzOKMLRUk.jpeg"));
+        BufferedImage headImage = ImageIO.read(new URL("http://mmbiz.qpic.cn/mmbiz_png/YBlrUyYcnjTZ3cC7FxHJdDiaYoABsiciaHiakibw1YBxj58t9ZvteaOUyt2PuIJrWuHVmXJubdp0K9JiaE4EKLcJYjuw/0"));
         headImage = convertCircular(headImage);
 
         gh.drawImage(headImage, 48, 32, 50, 50, null);
 
-        gh.setColor(new Color(23, 23, 23));
-        gh.setFont(new Font("微软雅黑", Font.PLAIN, 16));
-        gh.drawString("作者：Nazim Mehboob", 115, 50);//向图片上写随机字符串
-        gh.drawString("居住：莫斯科（俄罗斯🇷🇺）", 115, 75);//向图片上写随机字符串
+        gh.setColor(new Color(34, 34, 34));
 
-        gh.setColor(new Color(110, 110, 110));
+        BufferedImage userIcon = ImageIO.read(new URL("https://myblog.sharemer.com/wechat/icons/user.png"));
+        gh.drawImage(userIcon, 115, 35, 20, 20, null);
+        gh.setFont(new Font("微软雅黑", Font.PLAIN, 16));
+        gh.drawString("作者：Nazim Mehboob", 140, 50);
+
+        BufferedImage zbIcon = ImageIO.read(new URL("https://myblog.sharemer.com/wechat/icons/marker3.png"));
+        gh.drawImage(zbIcon, 115, 63, 20, 20, null);
+
+        gh.drawString("坐标：", 140, 80);
+        BufferedImage flagIcon = ImageIO.read(new URL("https://img.icons8.com/color/2x/finland.png"));
+        gh.drawImage(flagIcon, 185, 61, 28, 28, null);
+        gh.setFont(new Font("微软雅黑", Font.ITALIC, 12));
+        gh.setColor(new Color(136, 136, 136));
+        gh.drawString("（芬兰）", 210, 80);
+
+        gh.setColor(new Color(172, 220, 15));
         gh.drawOval(48, 32, 50, 50);
-        gh.setColor(new Color(110, 110, 110, 150));
+        gh.setColor(new Color(172, 220, 15, 150));
         gh.drawOval(45, 29, 56, 56);
-        gh.setColor(new Color(110, 110, 110, 100));
+        gh.setColor(new Color(172, 220, 15, 100));
         gh.drawOval(42, 26, 62, 62);
-        gh.setColor(new Color(110, 110, 110, 50));
+        gh.setColor(new Color(172, 220, 15, 50));
         gh.drawOval(39, 23, 68, 68);
-        gh.setColor(new Color(110, 110, 110, 15));
+        gh.setColor(new Color(172, 220, 15, 15));
         gh.drawOval(36, 20, 74, 74);
 
-        ImageIO.write(bi, "PNG", Files.newOutputStream(Paths.get("/Users/sunqinwen/Downloads/test.png")));//把图片输出到指定路径
+        gh.setFont(new Font("微软雅黑", Font.PLAIN, 16));
+        gh.setColor(new Color(56, 56, 56));
+
+        gh.drawString("Quora指标：", 210, 80);
+
+        ImageIO.write(bi, "PNG", Files.newOutputStream(Paths.get("D:/test.png")));//把图片输出到指定路径
     }
 
     // 让图片变成圆形
