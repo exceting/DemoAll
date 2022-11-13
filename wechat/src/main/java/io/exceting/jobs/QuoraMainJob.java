@@ -30,10 +30,19 @@ public class QuoraMainJob {
         InitProcessor.INSTANT.attachYoudaoKey("/Users/sunqinwen/Downloads/youdaoKey.txt");
 
         String title = "Quora问题：你到中国后发现有什么和自己预想不一样的事物？";
-        QuoraAnswer answer = QuoraProcessor.INSTANT.getAnswerByUrl("Have-foreigners-changed-the-way-they-think-about-China-after-visiting", "Maya-Kaiser");
+        String user = "Maya-Kaiser";
+        QuoraAnswer answer = QuoraProcessor.INSTANT.getAnswerByUrl("Have-foreigners-changed-the-way-they-think-about-China-after-visiting", user);
 
         List<String> images = Lists.newArrayList();
         answer.getSections().stream().filter(s -> s.getType().equals("image")).forEach(s -> s.getSpans().forEach(span -> images.add(span.getModifiers().getImage())));
+
+        MediaUpload headerImg = ImageProcessor.INSTANT.mediaUpload(String.format("%s.jpg", UUID.randomUUID()),
+                QuoraProcessor.INSTANT.getHeaderImg(user,
+                        "http://mmbiz.qpic.cn/mmbiz_png/YBlrUyYcnjTZ3cC7FxHJdDiaYoABsiciaHiakibw1YBxj58t9ZvteaOUyt2PuIJrWuHVmXJubdp0K9JiaE4EKLcJYjuw/0",
+                        "印度", "https://myblog.sharemer.com/wechat/flags/india.png",
+                        "233K", "14k", "2/205"));
+
+        System.out.printf("版头生成并上传完成！mediaID = %s, url = %s", headerImg.getMediaId(), headerImg.getUrl());
 
         Map<String, String> quoraToWechatMap = Maps.newHashMap();
         List<String> imageMediaIds = Lists.newArrayList();

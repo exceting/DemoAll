@@ -12,6 +12,10 @@ public class Constants {
 
     public static final String YOUDAO_URL = "https://openapi.youdao.com";
 
+    public static final String QUORA_HEADER_BG = "https://myblog.sharemer.com/wechat/header_pics/quora_bg_final.png";
+
+    public static final String QUORA_TAIL_BG = "";
+
 
     public static final Map<String, String> VAL_MAP = Maps.newConcurrentMap();
 
