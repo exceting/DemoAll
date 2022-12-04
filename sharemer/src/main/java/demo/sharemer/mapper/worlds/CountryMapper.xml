@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2009-2022 BiliBili Inc.
+  -->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="demo.sharemer.mapper.worlds.CountryMapper">
+
+    <update id="updateIcon">
+        UPDATE countries
+        SET `icon` = #{icon}
+        WHERE `id` = #{id}
+    </update>
+
+    <select id="getCountries" resultType="demo.sharemer.model.Country">
+        SELECT `id`, `name`, `translations`, `icon`, `alias`
+        FROM countries
+        WHERE id ${in_or_notin}
+    </select>
+
+    <select id="getStates" resultType="demo.sharemer.model.Country">
+        SELECT c.`id`, st.`name`, c.`translations`, c.`icon`
+        FROM states st
+                 JOIN countries c ON st.country_id = c.id
+        WHERE LENGTH(st.name) &gt; 3
+          AND st.country_id ${in_or_notin}
+    </select>
+
+    <select id="getCities" resultType="demo.sharemer.model.Country">
+        SELECT c.`id`, ct.`name`, c.`translations`, c.`icon`
+        FROM cities ct
+                 JOIN countries c ON ct.country_id = c.id
+        WHERE LENGTH(ct.name) &gt; 3
+          AND ct.country_id ${in_or_notin}
+    </select>
+
+</mapper>

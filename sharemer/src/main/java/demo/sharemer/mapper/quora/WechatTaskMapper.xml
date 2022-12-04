@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2009-2022 BiliBili Inc.
+  -->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="demo.sharemer.mapper.quora.WechatTaskMapper">
+
+    <insert id="insert" parameterType="demo.sharemer.model.WechatTask" useGeneratedKeys="true"
+            keyProperty="pojo.id">
+        INSERT INTO t_wechat_task
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="pojo.id != null">`id`,</if>
+            <if test="pojo.mediaId != null">`media_id`,</if>
+            <if test="pojo.url != null">`url`,</if>
+            <if test="pojo.questionId != null">`question_id`,</if>
+            <if test="pojo.parentId != null">`parent_id`,</if>
+            <if test="pojo.answerId != null">`answer_id`,</if>
+            <if test="pojo.color != null">`color`,</if>
+            <if test="pojo.state != null">`state`,</if>
+            <if test="pojo.ctime != null">`ctime`,</if>
+            <if test="pojo.mtime != null">`mtime`,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="pojo.id != null">#{pojo.id},</if>
+            <if test="pojo.mediaId != null">#{pojo.mediaId},</if>
+            <if test="pojo.url != null">#{pojo.url},</if>
+            <if test="pojo.questionId != null">#{pojo.questionId},</if>
+            <if test="pojo.parentId != null">#{pojo.parentId},</if>
+            <if test="pojo.answerId != null">#{pojo.answerId},</if>
+            <if test="pojo.color != null">#{pojo.color},</if>
+            <if test="pojo.state != null">#{pojo.state},</if>
+            <if test="pojo.ctime != null">#{pojo.ctime},</if>
+            <if test="pojo.mtime != null">#{pojo.mtime},</if>
+        </trim>
+    </insert>
+
+    <update id="update" parameterType="demo.sharemer.model.WechatTask">
+        UPDATE t_wechat_task
+        <trim prefix="set" suffixOverrides=",">
+            <if test="pojo.id != null">`id` = #{pojo.id},</if>
+            <if test="pojo.mediaId != null">`media_id` = #{pojo.mediaId},</if>
+            <if test="pojo.url != null">`url` = #{pojo.url},</if>
+            <if test="pojo.questionId != null">`question_id` = #{pojo.questionId},</if>
+            <if test="pojo.parentId != null">`parent_id` = #{pojo.parentId},</if>
+            <if test="pojo.answerId != null">`answer_id` = #{pojo.answerId},</if>
+            <if test="pojo.color != null">`color` = #{pojo.color},</if>
+            <if test="pojo.state != null">`state` = #{pojo.state},</if>
+            <if test="pojo.ctime != null">`ctime` = #{pojo.ctime},</if>
+            <if test="pojo.mtime != null">`mtime` = #{pojo.mtime},</if>
+        </trim>
+        WHERE id = #{pojo.id}
+    </update>
+
+    <select id="one" resultType="demo.sharemer.model.WechatTask">
+        SELECT `id`,
+               `media_id`    AS mediaId,
+               `url`,
+               `question_id` AS questionId,
+               `parent_id`   AS parentId,
+               `answer_id`   AS answerId,
+               `color`,
+               `state`,
+               `ctime`,
+               `mtime`
+        FROM t_wechat_task
+        WHERE id = #{id}
+          AND state = 0
+    </select>
+
+    <select id="getByAid" resultType="demo.sharemer.model.WechatTask">
+        SELECT `id`,
+               `media_id`    AS mediaId,
+               `url`,
+               `question_id` AS questionId,
+               `parent_id`   AS parentId,
+               `answer_id`   AS answerId,
+               `color`,
+               `state`,
+               `ctime`,
+               `mtime`
+        FROM t_wechat_task
+        WHERE answer_id = #{aid}
+          AND state = 0
+    </select>
+
+    <select id="getByParentId" resultType="demo.sharemer.model.WechatTask">
+        SELECT `id`,
+               `media_id`    AS mediaId,
+               `url`,
+               `question_id` AS questionId,
+               `parent_id`   AS parentId,
+               `answer_id`   AS answerId,
+               `color`,
+               `state`,
+               `ctime`,
+               `mtime`
+        FROM t_wechat_task
+        WHERE parent_id = #{parentId}
+          AND state = 0
+    </select>
+
+
+</mapper>

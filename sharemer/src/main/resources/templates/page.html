@@ -1,0 +1,35 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title th:text="${rmap.title}"></title>
+    <style>
+        .content-box {
+            margin: 0 auto;
+            border: 1px solid #dee0e1;
+            width: 677px;
+            height: auto;
+            min-height: 20px;
+            padding: 16px;
+        }
+        blockquote {
+            padding-left: 10px;
+            border-left: 3px solid #DBDBDB;
+            color: rgba(0,0,0,.5);
+            font-size: 15px;
+            padding-top: 4px;
+            margin: 1em 0;
+        }
+        section {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+<div class="content-box">
+    <span th:utext="${rmap.content}"></span>
+</div>
+
+<hr/>
+<span th:text="${rmap.content}"></span>
+</body>
+</html>

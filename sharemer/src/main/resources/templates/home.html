@@ -1,0 +1,327 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Sharemer</title>
+    <style>
+        .grid-shi {
+            height: 100vh;
+            background: linear-gradient(to right, #ececec 1px, transparent 1px),
+            linear-gradient(to bottom, #ececec 1px, transparent 1px);
+            background-repeat: repeat; /* 默认为 repeat */
+            background-size: 20px 20px;
+        }
+
+        .banner {
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: -1;
+            width: 100%;
+            height: 250px;
+            background-image: url("https://myblog.sharemer.com/sharemer/common/3962.jpg?imageView2/1/w/1920/h/350");
+        }
+
+        .menu {
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 1;
+            background-color: rgba(255, 255, 255, 1);
+            width: 100%;
+            height: 80px;
+            border-bottom: 1px solid #dee0e1;
+        }
+
+        .top_box {
+            margin: 0 auto;
+            width: 70%;
+            height: 100%;
+
+        }
+
+        .logo {
+            margin-top: 10px;
+            float: left;
+            width: 268px;
+            height: 65px;
+            background-position: -20px, -10px;
+            background-image: url("http://media.sharemer.com/sharemer/common/logo2.png");
+        }
+
+        .top_unit {
+            float: left;
+            text-align: center;
+            width: 135px;
+            height: 65px;
+            font-size: 18px;
+            padding-top: 35px;
+            color: #8a8a8a;
+        }
+
+        .main {
+            margin: 0 auto;
+            width: 36%;
+            height: auto;
+            min-height: 10px;
+            padding-top: 102px;
+        }
+
+        .page-nation {
+            margin: 0 auto;
+            width: 36%;
+            height: 56px;
+            padding-top: 15px;
+            text-align: center;
+        }
+
+        .main_u {
+            width: 100%;
+            height: auto;
+            min-height: 50px;
+            float: left;
+            background-color: rgba(255, 255, 255, 1);
+            border: 1px solid #dee0e1;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .main_u_box_1 {
+            width: 100%;
+            float: left;
+            height: 56px;
+            border-bottom: 1px solid #dee0e1;
+        }
+
+        .main_u_box_1_user {
+            margin-top: 6px;
+            margin-left: 15px;
+            float: left;
+            width: 41px;
+            height: 41px;
+            border: 2px solid #dee0e1;
+            border-radius: 100px;
+        }
+
+        .main_u_box_1_desc {
+            margin-top: 8px;
+            margin-left: 15px;
+            float: left;
+            min-width: 40px;
+            width: auto;
+            height: 40px;
+        }
+
+        .main_u_box_1_time {
+            margin-top: 8px;
+            margin-right: 20px;
+            float: right;
+            height: 40px;
+        }
+
+        .main_u_box_2 {
+            float: left;
+            min-height: 50px;
+            height: auto;
+            padding: 15px;
+            font-size: 14px;
+            color: rgb(40, 40, 41);
+        }
+
+        .main_u_box_imgs {
+            position: relative;
+            float: left;
+            padding-left: 15px;
+            height: 135px;
+        }
+
+        .main_u_box_3 {
+            width: 100%;
+            float: left;
+            height: 35px;
+            margin-top: 15px;
+            border-top: 1px solid #dee0e1;
+        }
+
+        .main_u_box_3 {
+            width: 100%;
+            float: left;
+            height: 35px;
+            margin-top: 15px;
+            border-top: 1px solid #dee0e1;
+            color: #9f9f9f;
+            font-size: 13px
+        }
+
+        .main_u_box_3_u {
+            width: 29%;
+            float: left;
+            padding-top: 6px;
+            height: 100%;
+            padding-left: 25px;
+        }
+
+        a {
+            color: #0097cd;
+            cursor: pointer;
+        }
+
+        a:hover {
+            color: #00b7ff;
+        }
+    </style>
+</head>
+
+<body class="grid-shi">
+<div class="menu">
+    <div class="top_box">
+        <div class="logo"></div>
+        <div class="top_unit">
+            首页
+        </div>
+        <div class="top_unit">
+            精选
+        </div>
+        <div class="top_unit">
+            榜单
+        </div>
+    </div>
+</div>
+<!--<div class="banner"></div>-->
+
+<div id="main" class="main">
+
+</div>
+
+<div class="page-nation">
+    <a onclick="executeGetAjax(11031354, curr_page-1, 10)">&lt;&lt;上一页</a>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <a onclick="executeGetAjax(11031354, curr_page+1, 10)">下一页&gt;&gt;</a>
+    &nbsp;&nbsp;&nbsp;&nbsp;
+    <span id="curr_page"></span>
+</div>
+
+<span id="qid" style="display: none">11031354</span>
+
+<script type="text/javascript" src="https://cdn.bootcss.com/jquery/1.8.3/jquery.min.js"></script>
+<script type="text/javascript">
+
+    executeGetAjax(document.getElementById("qid").innerText, 1, 10)
+
+    var curr_page = 1;
+
+    function detail(aid, imgs) {
+        $.ajax({
+            url: '/quora/get_answer_detail_by_aid',
+            type: 'get',
+            async: true,
+            data: {
+                aid: aid
+            },
+            dataType: 'text',
+            success: function (dataStr) {
+                let data = JSON.parse(dataStr)
+                if (data.code === 0) {
+                    document.getElementById(("as_preview_" + aid)).style.display = 'none'
+                    if (imgs) {
+                        document.getElementById(("as_imgs_" + aid)).style.display = 'none'
+                    }
+                    document.getElementById(("as_content_" + aid)).style.display = 'block'
+                    document.getElementById(("as_content_" + aid)).innerHTML = (data.t + "<br/><a onclick='detailHide(" + aid + ", " + imgs + ")'>收起</a>")
+                }
+            }
+        })
+    }
+
+    function detailHide(aid, imgs) {
+        document.getElementById(("as_preview_" + aid)).style.display = 'block'
+        if (imgs) {
+            document.getElementById(("as_imgs_" + aid)).style.display = 'block'
+        }
+        document.getElementById(("as_content_" + aid)).style.display = 'none'
+    }
+
+    function executeGetAjax(qid, pn, ps) {
+        <!--  data中传递json对象  -->
+        $.ajax({
+            url: '/quora/get_answers_by_qid',
+            type: 'get',
+            async: true,
+            data: {
+                qid: qid,
+                pn: pn,
+                ps: ps
+            },
+            dataType: 'text',
+            success: function (dataStr) {
+                let data = JSON.parse(dataStr)
+                let html = "";
+                if (data.code === 0) {
+                    curr_page = pn
+                    if (data.t) {
+                        let items = data.t.data;
+                        if (items && items.length > 0) {
+                            items.forEach(i => {
+                                html += "<div class=\"main_u\"><div class=\"main_u_box_1\"><div class=\"main_u_box_1_user\" style=\"background-image: url('http://media.sharemer.com/" + i.user.avatar + "?imageView2/1/w/40/h/40')\"></div>"
+                                    + "<div class=\"main_u_box_1_desc\">"
+                                    + "<strong>"
+                                    + i.user.name
+                                    + "</strong>&nbsp;"
+                                    + "<img src=\"http://media.sharemer.com/" + i.user.flag + "?imageView2/1/h/20\">"
+                                    + "<span style=\"color:#ffae00; font-size: 13px; font-style: italic\">(" + i.user.countryName + ")</span>\n"
+                                    + "&nbsp;&nbsp;"
+                                    + "<span style=\"color:#00beff; font-size: 13px;\">😍 粉丝量：" + i.user.followers + "</span>"
+                                    + "&nbsp;&nbsp;&nbsp;&nbsp;"
+                                    + "<span style=\"color:#00beff; font-size: 13px;\">🌾 字节：" + i.wordCount + "</span>"
+                                    + "<p style=\"color:#9f9f9f; font-size: 13px; line-height: 0.1\">"
+                                    + i.user.credentials
+                                    + "</p>"
+                                    + "</div>\n"
+                                    + "<div class=\"main_u_box_1_time\">"
+                                    + "<p style=\"color:#9f9f9f; font-size: 13px; line-height: 3\">"
+                                    + "🕜 "
+                                    + i.ctime
+                                    + "</p>"
+                                    + "</div>"
+                                    + "</div>"
+                                    + "<div class=\"main_u_box_2\" id=\"as_content_" + i.aid + "\" style='display: none'></div>"
+                                    + "<div class=\"main_u_box_2\" id=\"as_preview_" + i.aid + "\">"
+                                    + i.preview
+                                    + "<a onclick='detail("
+                                    + i.aid
+                                    + ", "
+                                    + (i.imgs && i.imgs.length > 0)
+                                    + ")'>查看全文</a></div>"
+                                if (i.imgs && i.imgCount && i.imgCount > 0) {
+                                    html += "<div class=\"main_u_box_imgs\" id=\"as_imgs_" + i.aid + "\">"
+                                        + "<div style=\"position: absolute; top: 0; left: 15px; width: auto; padding: 5px; border-radius: 6px 0; height: 25px; background-color: rgba(0,0,0,0.8); color:#FFF\">共" + i.imgCount + "张</div>"
+                                    i.imgs.forEach(im => {
+                                        html += "<img style=\"border-radius: 6px\" src=\"http://media.sharemer.com/" + im + "?imageView2/1/w/160/h/130\">&nbsp;"
+                                    })
+                                    html += "</div>"
+                                }
+                                html += "<div class=\"main_u_box_3\">"
+                                    + "<div class=\"main_u_box_3_u\">"
+                                    + "‍❀ 浏览量："
+                                    + i.viewCount
+                                    + "</div>"
+                                    + "<div class=\"main_u_box_3_u\">"
+                                    + "♡ 点赞量：" + i.likeCount + ""
+                                    + "</div>"
+                                    + "<div class=\"main_u_box_3_u\">"
+                                    + "➚ 分享量："
+                                    + i.shareCount
+                                    + "</div></div></div>"
+                            })
+
+                            document.getElementById("main").innerHTML = html
+                        }
+                        document.getElementById("curr_page").innerHTML = ("第" + pn + "页，共" + data.t.total + "条")
+                    }
+                }
+            }
+        })
+    }
+
+</script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ~ Copyright (c) 2009-2022 BiliBili Inc.
+  -->
+
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="demo.sharemer.mapper.quora.QuoraQuestionMapper">
+
+    <insert id="insert" parameterType="demo.sharemer.model.QuoraQuestion">
+        INSERT INTO t_quora_question
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="pojo.id != null">`id`,</if>
+            <if test="pojo.idx != null">`idx`,</if>
+            <if test="pojo.parentId != null">`parent_id`,</if>
+            <if test="pojo.topicId != null">`topic_id`,</if>
+            <if test="pojo.titleOri != null">`title_ori`,</if>
+            <if test="pojo.titleCn != null">`title_cn`,</if>
+            <if test="pojo.url != null">`url`,</if>
+            <if test="pojo.answerCount != null">`answer_count`,</if>
+            <if test="pojo.state != null">`state`,</if>
+            <if test="pojo.ctime != null">`ctime`,</if>
+            <if test="pojo.mtime != null">`mtime`,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="pojo.id != null">#{pojo.id},</if>
+            <if test="pojo.idx != null">#{pojo.idx},</if>
+            <if test="pojo.parentId != null">#{pojo.parentId},</if>
+            <if test="pojo.topicId != null">#{pojo.topicId},</if>
+            <if test="pojo.titleOri != null">#{pojo.titleOri},</if>
+            <if test="pojo.titleCn != null">#{pojo.titleCn},</if>
+            <if test="pojo.url != null">#{pojo.url},</if>
+            <if test="pojo.answerCount != null">#{pojo.answerCount},</if>
+            <if test="pojo.state != null">#{pojo.state},</if>
+            <if test="pojo.ctime != null">#{pojo.ctime},</if>
+            <if test="pojo.mtime != null">#{pojo.mtime},</if>
+        </trim>
+    </insert>
+
+    <update id="update" parameterType="demo.sharemer.model.QuoraQuestion">
+        UPDATE t_quora_question
+        <trim prefix="set" suffixOverrides=",">
+            <if test="pojo.id != null">`id` = #{pojo.id},</if>
+            <if test="pojo.idx != null">`idx` = #{pojo.idx},</if>
+            <if test="pojo.parentId != null">`parent_id` = #{pojo.parentId},</if>
+            <if test="pojo.topicId != null">`topic_id` = #{pojo.topicId},</if>
+            <if test="pojo.titleOri != null">`title_ori` = #{pojo.titleOri},</if>
+            <if test="pojo.titleCn != null">`title_cn` = #{pojo.titleCn},</if>
+            <if test="pojo.url != null">`url` = #{pojo.url},</if>
+            <if test="pojo.answerCount != null">`answer_count` = #{pojo.answerCount},</if>
+            <if test="pojo.state != null">`state` = #{pojo.state},</if>
+            <if test="pojo.ctime != null">`ctime` = #{pojo.ctime},</if>
+            <if test="pojo.mtime != null">`mtime` = #{pojo.mtime},</if>
+        </trim>
+        WHERE id = #{pojo.id}
+    </update>
+
+    <select id="one" resultType="demo.sharemer.model.QuoraQuestion">
+        SELECT `id`,
+               `idx`,
+               `parent_id`,
+               `parent_id`    AS parentId,
+               `topic_id`     AS topicId,
+               `title_ori`    AS titleOri,
+               `title_cn`     AS titleCn,
+               `url`,
+               `answer_count` AS answerCount,
+               `state`,
+               `ctime`,
+               `mtime`
+        FROM t_quora_question
+        WHERE `id` = #{id}
+          AND `state` = 0
+    </select>
+
+</mapper>

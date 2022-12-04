@@ -1,0 +1,52 @@
+server:
+  port: 8081
+spring:
+  thymeleaf:
+    cache: false
+    check-template: true
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML5
+    encoding: UTF-8
+    servlet:
+      content-type: text/html
+
+app:
+  wechatUrl: https://api.weixin.qq.com
+  quoraUrl: https://www.quora.com
+  youdaoUrl: https://openapi.youdao.com
+  qiniuUrl: https://upload.qiniup.com
+  sharemerUrl: http://media.sharemer.com
+  quoraHeaderBg: https://myblog.sharemer.com/wechat/header_pics/quora_head_bg_f1.png
+  quoraDefaultCover: 3WbXOOIUbcDLYybxoF7K9veKTuqVR-6KbuKMeJdvujYVjoxAoBdFW9BMg4cn8rNr
+  quoraTailBg: https://mmbiz.qpic.cn/mmbiz_png/YBlrUyYcnjSYuQicSCRWZVuKDT1AMhjToc5Y3xJ2OEmDqesTtzfvic9r7ns9vMPqPnrDpsOwrvc9lAUlOCuHheGQ/0
+  appIdPath: /Users/sunqinwen/Downloads/wechatAppInfo.txt
+  accessTokenPath: /Users/sunqinwen/Downloads/wechatToken.txt
+  youdaoPath: /Users/sunqinwen/Downloads/youdaoKey.txt
+  qiniuPath: /Users/sunqinwen/Downloads/qiniuKey.txt
+  quoraFormKey: "a22b2d5a8563dfbd9d8a00a80598c174"
+  getAnswersHash: "36529ff8b260e281550390313450a3b2143386bdf5b5165b729f4ec71bbd1e51"
+  quoraCookie: "m-b=F8jo0HLFOCD9cdtCL233Hg==;"
+
+mysql:
+  quora:
+    url: jdbc:mysql://127.0.0.1:3306/quora_content_db?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&autoReconnect=true&zeroDateTimeBehavior=convertToNull
+    username: root
+    password: 123456
+    maxActive: 15
+    minIdle: 1
+    maxWait: 1000
+    testOnBorrow: true
+    removeAbandoned: true
+    initialSize: 1
+
+  worlds:
+    url: jdbc:mysql://127.0.0.1:3306/worlds?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&autoReconnect=true&zeroDateTimeBehavior=convertToNull
+    username: root
+    password: 123456
+    maxActive: 15
+    minIdle: 1
+    maxWait: 1000
+    testOnBorrow: true
+    removeAbandoned: true
+    initialSize: 1
