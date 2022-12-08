@@ -125,12 +125,14 @@
                tqu.avatar,
                tqu.country_id,
                tqu.followers,
-               tqu.credentials
+               tqu.credentials,
+               twt.media_id,
+               twt.color
         FROM t_quora_answer tqa
-                 JOIN t_quora_user tqu ON tqa.user_id = tqu.id
+                 LEFT JOIN t_quora_user tqu ON tqa.user_id = tqu.id AND tqu.state = 0
+        LEFT JOIN t_wechat_task twt ON twt.answer_id = tqa.id AND twt.state = 0
         WHERE tqa.question_id = #{qid}
           AND tqa.state = 0
-          AND tqu.state = 0
         ORDER BY ctime DESC
             LIMIT #{offset}
                , #{ps}
@@ -144,6 +146,8 @@
         <result property="shareCount" column="share_count"/>
         <result property="wordCount" column="word_count"/>
         <result property="ctime" column="ctime"/>
+        <result property="mediaId" column="media_id"/>
+        <result property="color" column="color"/>
         <association property="user" javaType="demo.sharemer.model.res.AnswerResp$User">
             <id property="id" column="user_id"/>
             <result property="name" column="name"/>

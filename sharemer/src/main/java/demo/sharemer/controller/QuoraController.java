@@ -1,5 +1,6 @@
 package demo.sharemer.controller;
 
+import com.google.common.collect.Lists;
 import demo.sharemer.mapper.quora.QuoraAnswerMapper;
 import demo.sharemer.model.QuoraAnswer;
 import demo.sharemer.model.res.AnswerResp;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import javax.annotation.Resource;
+import java.util.List;
 
 @Slf4j
 @RequestMapping("/quora")
@@ -46,6 +48,17 @@ public class QuoraController {
     @GetMapping("/export_to_wechat")
     public BaseResponse<String> exportToWechat(@RequestParam Long qid, @RequestParam Long aid) throws Exception {
         quoraProcessor.exportToWechat(qid, aid);
+        return BaseResponse.success("success!");
+    }
+
+    @GetMapping("/exports_to_wechat")
+    public BaseResponse<String> exportsToWechat(@RequestParam Long qid, @RequestParam String aids) throws Exception {
+        String[] aidArray = aids.split(",");
+        List<Long> aidList = Lists.newArrayList();
+        for (String aid : aidArray) {
+            aidList.add(Long.parseLong(aid));
+        }
+        quoraProcessor.exportToWechat(qid, aidList);
         return BaseResponse.success("success!");
     }
 }

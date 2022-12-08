@@ -30,10 +30,10 @@ import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.net.URL;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -98,16 +98,29 @@ public class QuoraProcessor {
         wechatHtml(qid, Lists.newArrayList(aid));
     }
 
-    private void wechatHtml(Long qid, List<Long> aids) throws Exception {
-        // TODO 先清除旧
+    public void exportToWechat(Long qid, List<Long> aids) throws Exception {
+        wechatHtml(qid, aids);
+    }
 
+    private void wechatHtml(Long qid, List<Long> aids) throws Exception {
 
         StringBuilder sb = new StringBuilder();
 
         QuoraQuestion question = quoraQuestionMapper.one(qid);
         if (question == null) {
-            return;
+            throw new IllegalStateException("问题不存在！");
         }
+
+        if (aids == null || aids.size() == 0) {
+            throw new IllegalStateException("不可以输入空回答！");
+        }
+
+        aids.forEach(aid -> {
+            WechatTask task = wechatTaskMapper.getByAid(aid);
+            if (task != null) {
+                throw new IllegalStateException("aid=" + aid + "的回答已经发过公众号了！");
+            }
+        });
 
         Integer total = quoraAnswerMapper.getAnswersByQidCount(qid);
 
@@ -131,7 +144,7 @@ public class QuoraProcessor {
                 if (country == null) {
                     country = new Country();
                     country.setCnName("未知地区");
-                    country.setIcon(String.format("%s/%s", appProperties.getSharemerUrl(), "sharemer/flags/antarctica.png"));
+                    country.setIcon("sharemer/flags/antarctica.png");
                 }
                 String vc;
                 if (answer.getViewCount() > 1000) {
@@ -178,7 +191,7 @@ public class QuoraProcessor {
                 log.info("图片全部上传完成！现在开始生成文本");
                 sb.append(String.format("<center><img src = '%s'/></center>", headerImg.getUrl()));
                 qiniuToWechatMap.forEach((k, v) -> answer.setContentCn(answer.getContentCn().replace(k, v)));
-                sb.append(answer.getContentCn().replaceAll("<p>", "<p style='margin-bottom: 20px'>"));
+                sb.append(answer.getContentCn().replaceAll("<p></p>", "").replaceAll("<p>", "<p style='margin-bottom: 20px'>"));
                 sb.append("</br><span style=\"color: rgb(178, 178, 178);\">")
                         .append("作者：")
                         .append(quoraUser.getName())
@@ -187,7 +200,7 @@ public class QuoraProcessor {
                         .append(YYYY_MM_DD_HH_MM_SS.format(answer.getCtime()))
                         .append("</span>");
                 if (i != size) {
-                    sb.append("</br></br><hr/></br></br>");
+                    sb.append("</br></br><hr/></br>");
                 } else {
                     sb.append(String.format("<br/><center><img src = '%s'/></center>", appProperties.getQuoraTailBg()));
                 }
@@ -207,17 +220,27 @@ public class QuoraProcessor {
                     getCover(String.format("%s/%s", appProperties.getSharemerUrl(), coverImg.getQiniuUrl())));
         }
 
-        String title = String.format((users.size() > 1 ? "Quora问题：%s-来自%s等人的回答" : "Quora问题：%s-来自%s的回答"), question.getTitleCn(), users.get(0).getName());
+        String title = String.format((users.size() > 1 ? "来自%s等人的回答：%s" : "来自%s的回答：%s"), users.get(0).getName(), question.getTitleCn());
 
         AddDraft draft = wechatService.addDraft(Constants.VAL_MAP.get(Constants.VAL_MAP_ACCESS_TOKEN),
                 title, null, sb.toString(), cover == null ? appProperties.getQuoraDefaultCover() : cover.getMediaId());
 
         System.out.println("上传成功！草稿mediaId=" + draft.getMediaId());
 
+        String color = randomRgb();
         tasks.forEach(t -> {
+            t.setColor(color);
             t.setMediaId(draft.getMediaId());
             wechatTaskMapper.insert(t);
         });
+    }
+
+    private String randomRgb() {
+        Random random = new Random();
+        int r = random.nextInt(256);
+        int b = random.nextInt(256);
+        int g = random.nextInt(256);
+        return String.format("rgb(%d, %d, %d)", r, b, g);
     }
 
     public Page<AnswerResp> getAnswersByQid(Long qid, Integer pn, Integer ps) {

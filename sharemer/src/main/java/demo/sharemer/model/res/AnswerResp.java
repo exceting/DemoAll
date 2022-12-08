@@ -27,6 +27,11 @@ public class AnswerResp {
     @JSONField(name = "word_count")
     private Long wordCount;
 
+    @JSONField(name = "media_id")
+    private String mediaId;
+
+    private String color;
+
     private LocalDateTime ctime;
 
     private User user;

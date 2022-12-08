@@ -261,7 +261,12 @@
                         let items = data.t.data;
                         if (items && items.length > 0) {
                             items.forEach(i => {
-                                html += "<div class=\"main_u\"><div class=\"main_u_box_1\"><div class=\"main_u_box_1_user\" style=\"background-image: url('http://media.sharemer.com/" + i.user.avatar + "?imageView2/1/w/40/h/40')\"></div>"
+                                if (i.color) {
+                                    html += "<div class=\"main_u\" style='border-left: 2px solid " + i.color + "'>"
+                                } else {
+                                    html += "<div class=\"main_u\">"
+                                }
+                                html += "<div class=\"main_u_box_1\"><div class=\"main_u_box_1_user\" style=\"background-image: url('http://media.sharemer.com/" + i.user.avatar + "?imageView2/1/w/40/h/40')\"></div>"
                                     + "<div class=\"main_u_box_1_desc\">"
                                     + "<strong>"
                                     + i.user.name

@@ -244,11 +244,6 @@ public class QuoraToDBJob {
                 if (cnsb != null) {
                     cnsb.append("<blockquote class=\"js_blockquote_wrap\"><section class=\"js_blockquote_digest\">");
                 }
-            } else {
-                ensb.append("<p>");
-                if (cnsb != null) {
-                    cnsb.append("<p>");
-                }
             }
 
             if (section.getType().equals("image")) {
@@ -302,14 +297,14 @@ public class QuoraToDBJob {
                     ul = 0;
                 }
                 if (ol == 0) {
-                    ensb.append("<ol class=\"list-paddingleft-1\" style=\"list-style-type: decimal;\">");
+                    ensb.append("<ol class=\"list-paddingleft-1\" style=\"list-style-type: decimal; margin-bottom: 1em\">");
                     if (cnsb != null) {
-                        cnsb.append("<ol class=\"list-paddingleft-1\" style=\"list-style-type: decimal;\">");
+                        cnsb.append("<ol class=\"list-paddingleft-1\" style=\"list-style-type: decimal; margin-bottom: 1em\">");
                     }
                 }
-                ensb.append("<li>");
+                ensb.append("<li style=\"padding-bottom: 0.7em;\">");
                 if (cnsb != null) {
-                    cnsb.append("<li>");
+                    cnsb.append("<li style=\"padding-bottom: 0.7em;\">");
                 }
                 setSpans(section.getSpans(), ensb, cnsb, preview);
                 ensb.append("</li>");
@@ -326,14 +321,14 @@ public class QuoraToDBJob {
                     ol = 0;
                 }
                 if (ul == 0) {
-                    ensb.append("<ul class=\"list-paddingleft-1\" style=\"list-style-type: disc;\">");
+                    ensb.append("<ul class=\"list-paddingleft-1\" style=\"list-style-type: disc; margin-bottom: 1em\">");
                     if (cnsb != null) {
-                        cnsb.append("<ul class=\"list-paddingleft-1\" style=\"list-style-type: disc;\">");
+                        cnsb.append("<ul class=\"list-paddingleft-1\" style=\"list-style-type: disc; margin-bottom: 1em\">");
                     }
                 }
-                ensb.append("<li>");
+                ensb.append("<li style=\"padding-bottom: 0.7em;\">");
                 if (cnsb != null) {
-                    cnsb.append("<li>");
+                    cnsb.append("<li style=\"padding-bottom: 0.7em;\">");
                 }
                 setSpans(section.getSpans(), ensb, cnsb, preview);
                 ensb.append("</li>");
@@ -357,18 +352,21 @@ public class QuoraToDBJob {
                     ul = 0;
                 }
 
+                ensb.append("<p style=\"margin-bottom: 1em\">");
+                if (cnsb != null) {
+                    cnsb.append("<p style=\"margin-bottom: 1em\">");
+                }
                 setSpans(section.getSpans(), ensb, cnsb, preview);
+                ensb.append("</p>");
+                if (cnsb != null) {
+                    cnsb.append("</p>");
+                }
             }
 
             if (section.isQuoted()) {
                 ensb.append("</section></blockquote>");
                 if (cnsb != null) {
                     cnsb.append("</section></blockquote>");
-                }
-            } else {
-                ensb.append("</p>");
-                if (cnsb != null) {
-                    cnsb.append("</p>");
                 }
             }
         }
