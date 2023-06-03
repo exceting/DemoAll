@@ -4,9 +4,6 @@
   <component name="GradleSettings">
     <option name="linkedExternalProjectsSettings">
       <GradleProjectSettings>
-        <option name="delegatedBuild" value="true" />
-        <option name="testRunner" value="GRADLE" />
-        <option name="distributionType" value="DEFAULT_WRAPPED" />
         <option name="externalProjectPath" value="$PROJECT_DIR$" />
         <option name="gradleJvm" value="11" />
         <option name="modules">
@@ -18,6 +15,7 @@
             <option value="$PROJECT_DIR$/leetcode" />
             <option value="$PROJECT_DIR$/sharemer" />
             <option value="$PROJECT_DIR$/trace" />
+            <option value="$PROJECT_DIR$/we-media" />
             <option value="$PROJECT_DIR$/webtest" />
             <option value="$PROJECT_DIR$/wechat" />
           </set>
