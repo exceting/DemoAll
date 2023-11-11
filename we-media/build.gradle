@@ -29,6 +29,7 @@ dependencies {
     implementation libs['flexmark-util']
     implementation libs['commons-text']
     implementation libs['qiniu']
+    implementation libs['jsoup']
     compileOnly libs['lombok']
     annotationProcessor libs['lombok']
     testCompileOnly libs['lombok']

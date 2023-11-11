@@ -23,7 +23,8 @@ ext {
             'flexmark'      : '0.62.2',
             'selenium'      : '2.33.0',
             'commons-text'  : '1.1',
-            'qiniu'         : '7.12.+'
+            'qiniu'         : '7.12.+',
+            'jsoup'         : '1.16.1'
     ]
     libs = [
             'junit'                        : "junit:junit:${versions['junit']}",
@@ -57,6 +58,7 @@ ext {
             'flexmark-util'                : "com.vladsch.flexmark:flexmark-util:${versions['flexmark']}",
             'selenium'                     : "org.seleniumhq.selenium:selenium-java:${versions['selenium']}",
             'commons-text'                 : "org.apache.commons:commons-text:${versions['commons-text']}",
-            'qiniu'                        : "com.qiniu:qiniu-java-sdk:${versions['qiniu']}"
+            'qiniu'                        : "com.qiniu:qiniu-java-sdk:${versions['qiniu']}",
+            'jsoup'                        : "org.jsoup:jsoup:${versions['jsoup']}"
     ]
 }

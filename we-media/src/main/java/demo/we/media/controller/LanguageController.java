@@ -1,6 +1,6 @@
 package demo.we.media.controller;
 
-import demo.we.media.api.OfficalLanguageService;
+import demo.we.media.task.Processor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -13,11 +13,12 @@ import javax.annotation.Resource;
 public class LanguageController {
 
     @Resource
-    private OfficalLanguageService officalLanguageService;
+    private Processor<String> officalLanguageProcessor;
 
     @GetMapping("get_countries")
     public String getCountries(@RequestParam(name = "area_id") String areaId) throws Exception {
-        return officalLanguageService.getCountries(areaId);
+        officalLanguageProcessor.process(()-> areaId);
+        return "success!";
     }
 
 }
