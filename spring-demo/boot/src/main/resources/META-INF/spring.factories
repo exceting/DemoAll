@@ -1,0 +1,5 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration = \
+demo.spring.configurations.HelloWorldAutoConfiguration
+
+org.springframework.boot.SpringApplicationRunListener=\
+demo.spring.listeners.MyApplicationListener

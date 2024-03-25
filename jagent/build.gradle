@@ -1,0 +1,20 @@
+apply plugin: 'java-library'
+
+dependencies {
+    implementation libs["junit"]
+    implementation libs['guava']
+    implementation libs['javassist']
+}
+
+jar {
+    from {
+        // 将项目依赖（runtime 配置）打包进 JAR
+        configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
+    }
+    manifest {
+        attributes "Implementation-Title": project.name
+        attributes "Implementation-Version": '1.0.0'
+        attributes 'Main-Class': 'agent.test.Test'
+        attributes 'Premain-Class': 'agent.test.TestAgent'
+    }
+}

@@ -1,0 +1,24 @@
+buildscript {
+    dependencies {
+        classpath libs["springboot-gradle-plugin"]
+    }
+}
+
+apply plugin: 'io.spring.dependency-management'
+apply plugin: 'org.springframework.boot'
+
+dependencies {
+    implementation libs["junit"]
+    implementation libs["springboot-autoconfigure"]
+    implementation(libs["springboot-starter-web"]) {
+        exclude group: "org.springframework.boot", module: "spring-boot-starter-tomcat";
+    }
+    implementation libs["springboot-starter-jetty"]
+    //implementation libs["springboot-starter-jdbc"]
+    //implementation libs["mysql"]
+    //implementation libs["springboot-starter-webflux"]
+    implementation libs["slf4j"]
+    implementation libs["logback"]
+    compileOnly 'io.github.exceting:log-trace:0.0.1-SNAPSHOT'
+    annotationProcessor 'io.github.exceting:log-trace:0.0.1-SNAPSHOT'
+}

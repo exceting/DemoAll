@@ -6,3 +6,5 @@ dependencies {
     implementation libs['slf4j']
     implementation libs['guava']
 }
+sourceCompatibility = JavaVersion.VERSION_1_9
+targetCompatibility = JavaVersion.VERSION_1_9

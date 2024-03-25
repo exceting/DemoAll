@@ -1,0 +1,14 @@
+apply plugin: 'java-library'
+
+dependencies {
+    implementation libs["junit"]
+    implementation libs["spring-context"]
+    implementation libs["spring-tx"]
+    implementation libs["spring-aspects"]
+    implementation libs["aspectjweaver"]
+    compileOnly 'javax:javaee-api:8.0.1'
+    implementation libs["slf4j"]
+    implementation libs["logback"]
+    compileOnly 'io.github.exceting:log-trace:0.0.1-SNAPSHOT'
+    annotationProcessor 'io.github.exceting:log-trace:0.0.1-SNAPSHOT'
+}

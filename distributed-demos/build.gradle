@@ -1,0 +1,7 @@
+apply plugin: 'java-library'
+
+dependencies {
+    implementation libs["junit"]
+    implementation libs['guava']
+    implementation libs['zookeeper']
+}

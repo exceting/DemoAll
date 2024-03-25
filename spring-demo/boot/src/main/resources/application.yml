@@ -1,0 +1,10 @@
+server:
+  port: 8081
+
+spring1:
+  datasource:
+    type: 'com.zaxxer.hikari.HikariDataSource'
+    hikari:
+      url: jdbc:mysql://127.0.0.1:3306/quora_content_db?useUnicode=true&characterEncoding=UTF-8&allowMultiQueries=true&autoReconnect=true&zeroDateTimeBehavior=convertToNull
+      username: root
+      password: 123456

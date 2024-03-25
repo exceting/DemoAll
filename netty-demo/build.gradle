@@ -1,0 +1,11 @@
+apply plugin: 'java-library'
+
+dependencies {
+    implementation libs["junit"]
+    compileOnly 'javax:javaee-api:8.0.1'
+    implementation libs["slf4j"]
+    implementation libs["logback"]
+    implementation libs["netty"]
+    compileOnly 'io.github.exceting:log-trace:0.0.1-SNAPSHOT'
+    annotationProcessor 'io.github.exceting:log-trace:0.0.1-SNAPSHOT'
+}

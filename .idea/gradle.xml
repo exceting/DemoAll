@@ -11,9 +11,15 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/concurrent" />
             <option value="$PROJECT_DIR$/dbpool" />
+            <option value="$PROJECT_DIR$/distributed-demos" />
+            <option value="$PROJECT_DIR$/jagent" />
             <option value="$PROJECT_DIR$/jdk" />
             <option value="$PROJECT_DIR$/leetcode" />
+            <option value="$PROJECT_DIR$/netty-demo" />
             <option value="$PROJECT_DIR$/sharemer" />
+            <option value="$PROJECT_DIR$/spring-demo" />
+            <option value="$PROJECT_DIR$/spring-demo/boot" />
+            <option value="$PROJECT_DIR$/spring-demo/framework" />
             <option value="$PROJECT_DIR$/trace" />
             <option value="$PROJECT_DIR$/we-media" />
             <option value="$PROJECT_DIR$/webtest" />

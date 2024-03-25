@@ -3,5 +3,8 @@ configure(subprojects) { project ->
         project.sourceSets.main.resources {
             srcDirs 'src/main/resources', 'src/main/java'
         }
+        processResources {
+            duplicatesStrategy = DuplicatesStrategy.INCLUDE
+        }
     })
 }
